@@ -105,6 +105,123 @@ export class BountiesService {
     return result.rows[0];
   }
 
+  async listAvailable() {
+    const result = await this.db.query<{
+      address: string;
+      title: string;
+      description: string;
+      reward_wei: string;
+      chain_id: number;
+      company_address: string;
+      created_at: string;
+    }>(
+      `select address, title, description, reward_wei, chain_id, company_address, created_at
+       from bounties
+       order by created_at desc`,
+    );
+
+    if (!result.rows.length) {
+      return [];
+    }
+
+    const client = createPublicClient({
+      transport: http(process.env.RPC_URL),
+    });
+
+    const withStatus = await Promise.all(
+      result.rows.map(async (bounty) => {
+        try {
+          const status = await client.readContract({
+            address: bounty.address as `0x${string}`,
+            abi: bountyAbi,
+            functionName: "status",
+          });
+
+          return {
+            ...bounty,
+            status: Number(status),
+          };
+        } catch {
+          return {
+            ...bounty,
+            status: null,
+          };
+        }
+      }),
+    );
+
+    return withStatus.filter((bounty) => bounty.status === 0);
+  }
+
+  async listForActor(actorAddress: string) {
+    const bounties = await this.db.query<{
+      address: string;
+      title: string;
+      description: string;
+      reward_wei: string;
+      chain_id: number;
+      company_address: string;
+      created_at: string;
+    }>(
+      `select address, title, description, reward_wei, chain_id, company_address, created_at
+       from bounties
+       where company_address = $1
+       order by created_at desc`,
+      [actorAddress.toLowerCase()],
+    );
+
+    const reports = await this.db.query<{
+      id: string;
+      bounty_address: string;
+      author_address: string;
+      title: string;
+      status: string;
+      report_hash: string;
+      created_at: string;
+      dispute_id: string | null;
+      dispute_status: string | null;
+      dispute_result: string | null;
+      votes_cast: number | null;
+    }>(
+      `select
+         r.id,
+         r.bounty_address,
+         r.author_address,
+         r.title,
+         r.status,
+         r.report_hash,
+         r.created_at,
+         d.id as dispute_id,
+         d.status as dispute_status,
+         d.result as dispute_result,
+         d.votes_cast
+       from reports r
+       join bounties b on b.address = r.bounty_address
+       left join disputes d
+         on d.bounty_address = r.bounty_address
+        and d.report_id_on_chain = r.report_id_on_chain
+       where b.company_address = $1
+       order by r.created_at desc`,
+      [actorAddress.toLowerCase()],
+    );
+
+    const reportsByBounty = new Map<string, typeof reports.rows>();
+    for (const report of reports.rows) {
+      const key = report.bounty_address.toLowerCase();
+      const existing = reportsByBounty.get(key);
+      if (existing) {
+        existing.push(report);
+      } else {
+        reportsByBounty.set(key, [report]);
+      }
+    }
+
+    return bounties.rows.map((bounty) => ({
+      ...bounty,
+      reports: reportsByBounty.get(bounty.address.toLowerCase()) ?? [],
+    }));
+  }
+
   async getReports(address: string) {
     const result = await this.db.query(
       "select * from reports where bounty_address = $1 order by created_at desc",

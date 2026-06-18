@@ -1,4 +1,4 @@
-import { RegisterBountyForm } from "../../components/forms";
+import { CompanyWorkspace } from "../../components/company-workspace";
 
 export default function CompanyPage() {
   return (
@@ -7,14 +7,7 @@ export default function CompanyPage() {
         <p className="eyebrow">Company workspace</p>
         <h1>Programas y recompensas</h1>
       </div>
-      <div className="workspace-grid">
-        <div className="panel panel-wide"><RegisterBountyForm /></div>
-        <div className="status-rail">
-          <div><span>Escrow</span><strong>Deploy con wallet</strong></div>
-          <div><span>Validacion</span><strong>On-chain</strong></div>
-          <div><span>Disputas</span><strong>Arbitraje 3/3</strong></div>
-        </div>
-      </div>
+      <CompanyWorkspace />
     </section>
   );
 }

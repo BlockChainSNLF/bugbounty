@@ -15,7 +15,7 @@ export class ContractsService implements OnModuleInit {
   constructor(private readonly db: DatabaseService) {}
 
   onModuleInit() {
-    if (process.env.BOUNTY_ADDRESS && process.env.DISPUTE_ADDRESS) {
+    if (process.env.DISPUTE_ADDRESS) {
       this.timer = setInterval(() => {
         void this.syncConfiguredContracts().catch((error: unknown) => {
           this.logger.error(`sync failed: ${String(error)}`);
@@ -25,10 +25,36 @@ export class ContractsService implements OnModuleInit {
   }
 
   async syncConfiguredContracts() {
-    const bountyAddress = process.env.BOUNTY_ADDRESS as `0x${string}` | undefined;
     const disputeAddress = process.env.DISPUTE_ADDRESS as `0x${string}` | undefined;
-    if (!bountyAddress || !disputeAddress) {
-      return { synced: false, reason: "BOUNTY_ADDRESS or DISPUTE_ADDRESS missing" };
+    if (!disputeAddress) {
+      return { synced: false, reason: "DISPUTE_ADDRESS missing" };
+    }
+
+    const client = createPublicClient({
+      transport: http(process.env.RPC_URL),
+    });
+
+    const bountyRows = await this.db.query<{ address: string }>(
+      "select address from bounties order by created_at asc",
+    );
+
+    let bountyLogs = 0;
+    for (const row of bountyRows.rows) {
+      bountyLogs += await this.syncContract(client, row.address as `0x${string}`, bountyAbi);
+    }
+    const disputeLogs = await this.syncContract(client, disputeAddress, disputeAbi);
+
+    return {
+      synced: true,
+      bountyLogs,
+      disputeLogs,
+    };
+  }
+
+  async syncBountyAddress(bountyAddress: `0x${string}`) {
+    const disputeAddress = process.env.DISPUTE_ADDRESS as `0x${string}` | undefined;
+    if (!disputeAddress) {
+      return { synced: false, reason: "DISPUTE_ADDRESS missing" };
     }
 
     const client = createPublicClient({
@@ -158,16 +184,25 @@ export class ContractsService implements OnModuleInit {
         );
         break;
       case "VoteCast":
+        {
+          const dispute = await this.db.query<{ id: string }>(
+            "select id from disputes where dispute_id_on_chain = $1",
+            [Number(args.disputeId)],
+          );
+          if (!dispute.rows[0]) {
+            break;
+          }
         await this.db.query(
           `insert into arbitrator_votes (dispute_id, arbitrator_address, vote_result)
            values ($1, $2, $3)
            on conflict (dispute_id, arbitrator_address) do nothing`,
           [
-            `${String(process.env.BOUNTY_ADDRESS).toLowerCase()}:${String(args.disputeId)}`,
+            dispute.rows[0].id,
             String(args.arbitrator).toLowerCase(),
             disputeResultLabels[Number(args.vote)],
           ],
         );
+        }
         break;
       case "DisputeFinalized":
         await this.db.query(
@@ -176,11 +211,11 @@ export class ContractsService implements OnModuleInit {
                status = 'FINALIZED',
                votes_cast = $2,
                finalized_at = now()
-           where id = $3`,
+           where dispute_id_on_chain = $3`,
           [
             disputeResultLabels[Number(args.result)],
             Number(args.votesCast),
-            `${String(process.env.BOUNTY_ADDRESS).toLowerCase()}:${String(args.disputeId)}`,
+            Number(args.disputeId),
           ],
         );
         break;

@@ -1,4 +1,4 @@
-import { ArbitratorPanel } from "../../components/arbitrator-panel";
+import { ArbitratorWorkspace } from "../../components/arbitrator-workspace";
 
 export default function ArbitratorPage() {
   return (
@@ -7,7 +7,7 @@ export default function ArbitratorPage() {
         <p className="eyebrow">Arbitrator workspace</p>
         <h1>Disputas asignadas</h1>
       </div>
-      <ArbitratorPanel />
+      <ArbitratorWorkspace />
     </section>
   );
 }

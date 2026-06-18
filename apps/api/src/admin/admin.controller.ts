@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, Param, Post } from "@nestjs/common";
 
 import { AuthService } from "../auth/auth.service.js";
 import { AdminService } from "./admin.service.js";
@@ -32,6 +32,15 @@ export class AdminController {
   ) {
     await this.authService.requireRole(authorization, ["admin"]);
     return this.adminService.registerArbitrator(body.address);
+  }
+
+  @Delete("arbitrators/:address")
+  async removeArbitrator(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("address") address: string,
+  ) {
+    await this.authService.requireRole(authorization, ["admin"]);
+    return this.adminService.removeArbitrator(address);
   }
 
   @Post("sync")

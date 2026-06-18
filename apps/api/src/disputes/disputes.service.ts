@@ -79,7 +79,7 @@ export class DisputesService {
       nextAction: {
         contract: process.env.DISPUTE_ADDRESS,
         method: "vote",
-        args: [BigInt(dispute.dispute_id_on_chain), voteResult],
+        args: [String(dispute.dispute_id_on_chain), voteResult],
       },
     };
   }

@@ -41,6 +41,25 @@ export class AdminService {
     };
   }
 
+  async removeArbitrator(address: string) {
+    await this.db.query(
+      `delete from users
+       where address = $1
+         and role = 'arbitrator'`,
+      [address.toLowerCase()],
+    );
+
+    return {
+      address: address.toLowerCase(),
+      removed: true,
+      nextAction: {
+        contract: process.env.DISPUTE_ADDRESS,
+        method: "removeArbitrator",
+        args: [address.toLowerCase()],
+      },
+    };
+  }
+
   async sync() {
     return this.contractsService.syncConfiguredContracts();
   }
