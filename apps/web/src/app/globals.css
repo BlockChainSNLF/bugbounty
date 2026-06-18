@@ -119,6 +119,14 @@ h3 {
   flex-wrap: wrap;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .nav-link,
 .button-link,
 button {
@@ -372,6 +380,29 @@ button:disabled {
   font-size: 0.78rem;
 }
 
+.session-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+  color: var(--cyan);
+  font-size: 0.82rem;
+}
+
+.session-pill-muted {
+  color: var(--muted);
+}
+
+.session-role {
+  color: var(--acid);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .mono {
   overflow-wrap: anywhere;
   font-family: "SFMono-Regular", Consolas, monospace;
@@ -432,6 +463,13 @@ button:disabled {
   .topbar,
   .page-heading {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar-right {
+    width: 100%;
+    align-items: flex-start;
+    justify-content: flex-start;
     flex-direction: column;
   }
 

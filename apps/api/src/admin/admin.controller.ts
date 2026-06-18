@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
 
 import { AuthService } from "../auth/auth.service.js";
 import { AdminService } from "./admin.service.js";
@@ -9,6 +9,12 @@ export class AdminController {
     private readonly authService: AuthService,
     private readonly adminService: AdminService,
   ) {}
+
+  @Get("overview")
+  async overview(@Headers("authorization") authorization: string | undefined) {
+    await this.authService.requireRole(authorization, ["admin"]);
+    return this.adminService.overview();
+  }
 
   @Post("companies/:address/approve")
   async approveCompany(

@@ -5,7 +5,8 @@ import { parseEther } from "viem";
 
 import { api } from "../lib/api";
 import { bountyAbi, bountyBytecode } from "../lib/bounty-contract";
-import { connectWallet, deployContractAction, waitForTransactionReceipt } from "../lib/wallet";
+import { ensureWalletSession } from "../lib/session";
+import { deployContractAction, waitForTransactionReceipt } from "../lib/wallet";
 
 export function RegisterBountyForm() {
   const [payload, setPayload] = useState({ title: "", description: "", rewardEth: "0.1" });
@@ -19,7 +20,8 @@ export function RegisterBountyForm() {
         setSubmitting(true);
         setResult(null);
 
-        const companyAddress = await connectWallet();
+        const session = await ensureWalletSession(["company", "admin"]);
+        const companyAddress = session.address;
         const deploySpec = await api<{ disputeAddress: `0x${string}`; chainId: number }>("/bounties/deploy-spec");
         const rewardWei = parseEther(payload.rewardEth);
         const deployHash = await deployContractAction({
@@ -76,27 +78,37 @@ export function RegisterBountyForm() {
 export function CreateReportForm() {
   const [payload, setPayload] = useState({ bountyAddress: "", title: "", description: "", poc: "", fileName: "poc.txt", mimeType: "text/plain", content: "" });
   const [result, setResult] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   return (
     <form onSubmit={async (event) => {
       event.preventDefault();
-      const response = await api<{ id: string; reportHash: string; nextAction: { method: string } }>("/reports", {
-        method: "POST",
-        body: JSON.stringify({
-          bountyAddress: payload.bountyAddress,
-          title: payload.title,
-          description: payload.description,
-          poc: payload.poc,
-          attachments: [
-            {
-              fileName: payload.fileName,
-              mimeType: payload.mimeType,
-              contentBase64: btoa(payload.content),
-            },
-          ],
-        }),
-      });
-      setResult(`Reporte recibido. Falta la confirmación final para dejar constancia del envío. Código de seguimiento: ${response.reportHash}`);
+      try {
+        setSubmitting(true);
+        setResult(null);
+        await ensureWalletSession(["hunter", "admin"]);
+        const response = await api<{ id: string; reportHash: string; nextAction: { method: string } }>("/reports", {
+          method: "POST",
+          body: JSON.stringify({
+            bountyAddress: payload.bountyAddress,
+            title: payload.title,
+            description: payload.description,
+            poc: payload.poc,
+            attachments: [
+              {
+                fileName: payload.fileName,
+                mimeType: payload.mimeType,
+                contentBase64: btoa(payload.content),
+              },
+            ],
+          }),
+        });
+        setResult(`Reporte recibido. Falta la confirmación final para dejar constancia del envío. Código de seguimiento: ${response.reportHash}`);
+      } catch (caught) {
+        setResult(caught instanceof Error ? caught.message : "No pudimos enviar el reporte");
+      } finally {
+        setSubmitting(false);
+      }
     }}>
       <div className="form-header">
         <span className="surface-kicker">Disclosure intake</span>
@@ -122,7 +134,7 @@ export function CreateReportForm() {
         <span>Adjunto</span>
         <textarea value={payload.content} onChange={(event) => setPayload({ ...payload, content: event.target.value })} placeholder="Contenido del archivo adjunto" />
       </label>
-      <button type="submit">Enviar reporte</button>
+      <button disabled={submitting} type="submit">{submitting ? "Enviando reporte..." : "Enviar reporte"}</button>
       {result ? <p>{result}</p> : null}
     </form>
   );

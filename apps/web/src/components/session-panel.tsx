@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { api } from "../lib/api";
-import { connectWallet, signMessage } from "../lib/wallet";
+import { ensureWalletSession, getStoredSession } from "../lib/session";
 
 export function SessionPanel() {
   const [session, setSession] = useState<{ address: string; role: string } | null>(null);
@@ -12,29 +11,16 @@ export function SessionPanel() {
 
   useEffect(() => {
     setHasProvider(typeof window !== "undefined" && Boolean(window.ethereum));
-    const savedRole = window.localStorage.getItem("bugbounty.role");
-    const savedAddress = window.localStorage.getItem("bugbounty.address");
-    if (savedRole && savedAddress) {
-      setSession({ role: savedRole, address: savedAddress });
+    const stored = getStoredSession();
+    if (stored) {
+      setSession({ role: stored.role, address: stored.address });
     }
   }, []);
 
   async function login() {
     try {
       setError(null);
-      const address = await connectWallet();
-      const nonce = await api<{ nonce: string; message: string }>("/auth/wallet/nonce", {
-        method: "POST",
-        body: JSON.stringify({ address }),
-      });
-      const signature = await signMessage(address, nonce.message);
-      const verified = await api<{ token: string; address: string; role: string }>("/auth/wallet/verify", {
-        method: "POST",
-        body: JSON.stringify({ address, signature }),
-      });
-      window.localStorage.setItem("bugbounty.token", verified.token);
-      window.localStorage.setItem("bugbounty.role", verified.role);
-      window.localStorage.setItem("bugbounty.address", verified.address);
+      const verified = await ensureWalletSession();
       setSession(verified);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "No pudimos conectar la wallet");

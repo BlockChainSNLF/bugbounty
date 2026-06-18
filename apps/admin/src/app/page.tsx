@@ -10,6 +10,13 @@ type Session = {
   role: string;
 };
 
+type Overview = {
+  companies: Array<{ address: string; company_approved: boolean; created_at: string }>;
+  arbitrators: Array<{ address: string; created_at: string }>;
+  bounties: Array<{ address: string; title: string; reward_wei: string; company_address: string; report_count: number; created_at: string }>;
+  disputes: Array<{ id: string; status: string; result: string | null; votes_cast: number; bounty_title: string | null; hunter_address: string; created_at: string }>;
+};
+
 function AdminLogin({ onSession }: { onSession(session: Session): void }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -122,8 +129,36 @@ function SyncPanel() {
   );
 }
 
+function trimAddress(address: string) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function DataPanel({
+  title,
+  eyebrow,
+  empty,
+  children,
+}: {
+  title: string;
+  eyebrow: string;
+  empty?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="panel data-panel">
+      <div className="form-header">
+        <span className="eyebrow">{eyebrow}</span>
+        <h2>{title}</h2>
+      </div>
+      {children || (empty ? <p>{empty}</p> : null)}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
 
   useEffect(() => {
     const token = window.localStorage.getItem("bugbounty.admin.token");
@@ -132,6 +167,30 @@ export default function AdminPage() {
       setSession({ address, role: "admin" });
     }
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    let mounted = true;
+    void api<Overview>("/admin/overview")
+      .then((response) => {
+        if (mounted) {
+          setOverview(response);
+          setOverviewError(null);
+        }
+      })
+      .catch((caught) => {
+        if (mounted) {
+          setOverviewError(caught instanceof Error ? caught.message : "No pudimos cargar el estado");
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [session]);
 
   if (!session) {
     return <AdminLogin onSession={setSession} />;
@@ -146,10 +205,65 @@ export default function AdminPage() {
         </div>
         <div className="session-pill">{session.address}</div>
       </header>
+      {overviewError ? <p className="danger">{overviewError}</p> : null}
       <section className="ops-grid">
         <div className="panel critical"><ApproveCompanyForm /></div>
         <div className="panel critical"><RegisterArbitratorForm /></div>
         <SyncPanel />
+      </section>
+      <section className="dashboard-grid">
+        <DataPanel title="Empresas" eyebrow="Companies">
+          <div className="list-grid">
+            {overview?.companies.length ? overview.companies.map((company) => (
+              <div className="list-row" key={company.address}>
+                <div>
+                  <strong>{trimAddress(company.address)}</strong>
+                  <span>{company.company_approved ? "Aprobada" : "Pendiente"}</span>
+                </div>
+                <time>{new Date(company.created_at).toLocaleDateString("es-AR")}</time>
+              </div>
+            )) : <p>Sin empresas registradas.</p>}
+          </div>
+        </DataPanel>
+        <DataPanel title="Árbitros" eyebrow="Jury">
+          <div className="list-grid">
+            {overview?.arbitrators.length ? overview.arbitrators.map((arbitrator) => (
+              <div className="list-row" key={arbitrator.address}>
+                <div>
+                  <strong>{trimAddress(arbitrator.address)}</strong>
+                  <span>Activo</span>
+                </div>
+                <time>{new Date(arbitrator.created_at).toLocaleDateString("es-AR")}</time>
+              </div>
+            )) : <p>Sin árbitros registrados.</p>}
+          </div>
+        </DataPanel>
+        <DataPanel title="Programas" eyebrow="Bounties">
+          <div className="list-grid">
+            {overview?.bounties.length ? overview.bounties.map((bounty) => (
+              <div className="list-row" key={bounty.address}>
+                <div>
+                  <strong>{bounty.title}</strong>
+                  <span>{trimAddress(bounty.company_address)} · {bounty.report_count} reportes</span>
+                </div>
+                <span>{bounty.reward_wei} wei</span>
+              </div>
+            )) : <p>Sin programas registrados.</p>}
+          </div>
+        </DataPanel>
+        <DataPanel title="Disputas recientes" eyebrow="Disputes">
+          <div className="list-grid">
+            {overview?.disputes.length ? overview.disputes.map((dispute) => (
+              <div className="list-row" key={dispute.id}>
+                <div>
+                  <strong>{dispute.bounty_title ?? "Programa sin nombre"}</strong>
+                  <span>{dispute.status} · {dispute.result ?? "Pendiente"} · {trimAddress(dispute.hunter_address)}</span>
+                </div>
+                <span>{dispute.votes_cast} votos</span>
+              </div>
+            )) : <p>Sin disputas registradas.</p>}
+          </div>
+        </DataPanel>
       </section>
     </main>
   );

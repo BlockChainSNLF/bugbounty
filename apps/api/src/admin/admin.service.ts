@@ -44,4 +44,56 @@ export class AdminService {
   async sync() {
     return this.contractsService.syncConfiguredContracts();
   }
+
+  async overview() {
+    const [companies, arbitrators, bounties, disputes] = await Promise.all([
+      this.db.query(
+        `select address, role, company_approved, created_at
+         from users
+         where role = 'company'
+         order by company_approved desc, created_at desc`,
+      ),
+      this.db.query(
+        `select address, role, created_at
+         from users
+         where role = 'arbitrator'
+         order by created_at desc`,
+      ),
+      this.db.query(
+        `select
+           b.address,
+           b.title,
+           b.reward_wei,
+           b.company_address,
+           b.created_at,
+           count(r.id)::int as report_count
+         from bounties b
+         left join reports r on r.bounty_address = b.address
+         group by b.address
+         order by b.created_at desc`,
+      ),
+      this.db.query(
+        `select
+           d.id,
+           d.status,
+           d.result,
+           d.votes_cast,
+           d.created_at,
+           d.bounty_address,
+           d.hunter_address,
+           b.title as bounty_title
+         from disputes d
+         left join bounties b on b.address = d.bounty_address
+         order by d.created_at desc
+         limit 12`,
+      ),
+    ]);
+
+    return {
+      companies: companies.rows,
+      arbitrators: arbitrators.rows,
+      bounties: bounties.rows,
+      disputes: disputes.rows,
+    };
+  }
 }
