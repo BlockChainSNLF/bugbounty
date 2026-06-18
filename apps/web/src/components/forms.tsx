@@ -8,11 +8,9 @@ import { bountyAbi, bountyBytecode } from "../lib/bounty-contract";
 import { ensureWalletSession, getPreferredWallet } from "../lib/session";
 import { deployContractAction, waitForTransactionReceipt, writeContractAction } from "../lib/wallet";
 
-const SUBMIT_REPORT_GAS_LIMIT = 180_000n;
-
-export function RegisterBountyForm() {
+export function RegisterBountyForm({ onCreated }: { onCreated(): Promise<unknown> }) {
   const [payload, setPayload] = useState({ title: "", description: "", rewardEth: "0.1" });
-  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   return (
@@ -20,7 +18,7 @@ export function RegisterBountyForm() {
       event.preventDefault();
       try {
         setSubmitting(true);
-        setResult(null);
+        setError(null);
 
         const session = await ensureWalletSession(["company", "admin"], getPreferredWallet() ?? undefined);
         const companyAddress = session.address;
@@ -48,9 +46,11 @@ export function RegisterBountyForm() {
             chainId: deploySpec.chainId,
           }),
         });
-        setResult(`Programa creado y registrado: ${response.address}`);
+        void response;
+        setPayload({ title: "", description: "", rewardEth: "0.1" });
+        await onCreated();
       } catch (caught) {
-        setResult(caught instanceof Error ? caught.message : "No pudimos crear el programa");
+        setError(caught instanceof Error ? caught.message : "No pudimos crear el programa");
       } finally {
         setSubmitting(false);
       }
@@ -72,7 +72,7 @@ export function RegisterBountyForm() {
         <input value={payload.rewardEth} onChange={(event) => setPayload({ ...payload, rewardEth: event.target.value })} placeholder="0.1" />
       </label>
       <button disabled={submitting} type="submit">{submitting ? "Creando programa..." : "Crear programa"}</button>
-      {result ? <p>{result}</p> : null}
+      {error ? <p className="danger">{error}</p> : null}
     </form>
   );
 }
@@ -81,7 +81,7 @@ function trimAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-export function CompanyBountiesPanel() {
+export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
   const [bounties, setBounties] = useState<Array<{
     address: string;
     title: string;
@@ -134,7 +134,7 @@ export function CompanyBountiesPanel() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   async function resolveReport(reportId: string, action: "accept" | "reject", bountyAddress: `0x${string}`) {
     try {
@@ -364,10 +364,13 @@ export function CreateReportForm() {
           functionName: response.nextAction.method,
           args: [response.reportHash],
           account: session.address as `0x${string}`,
-          gas: SUBMIT_REPORT_GAS_LIMIT,
         });
         await waitForTransactionReceipt(hash);
-        await api(`/bounties/${payload.bountyAddress}/sync`, { method: "POST" });
+        try {
+          await api(`/bounties/${payload.bountyAddress}/sync`, { method: "POST" });
+        } catch (caught) {
+          throw new Error(`El reporte quedó confirmado on-chain, pero falló la sincronización: ${caught instanceof Error ? caught.message : "error desconocido"}`);
+        }
         setResult(`Reporte enviado y confirmado on-chain. Código de seguimiento: ${response.reportHash}`);
       } catch (caught) {
         setResult(caught instanceof Error ? caught.message : "No pudimos enviar el reporte");
@@ -502,10 +505,13 @@ export function HunterReportsPanel() {
         functionName: intent.nextAction.method,
         args: intent.nextAction.args,
         account: session.address as `0x${string}`,
-        gas: SUBMIT_REPORT_GAS_LIMIT,
       });
       await waitForTransactionReceipt(hash);
-      await api(`/bounties/${bountyAddress}/sync`, { method: "POST" });
+      try {
+        await api(`/bounties/${bountyAddress}/sync`, { method: "POST" });
+      } catch (caught) {
+        throw new Error(`La disputa se abrió on-chain, pero falló la sincronización: ${caught instanceof Error ? caught.message : "error desconocido"}`);
+      }
       await loadReports();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "No pudimos abrir la disputa");
@@ -534,7 +540,11 @@ export function HunterReportsPanel() {
         account: session.address as `0x${string}`,
       });
       await waitForTransactionReceipt(hash);
-      await api(`/bounties/${bountyAddress}/sync`, { method: "POST" });
+      try {
+        await api(`/bounties/${bountyAddress}/sync`, { method: "POST" });
+      } catch (caught) {
+        throw new Error(`El reporte se confirmó on-chain, pero falló la sincronización: ${caught instanceof Error ? caught.message : "error desconocido"}`);
+      }
       await loadReports();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "No pudimos confirmar el reporte on-chain");

@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
+import { disputeAbi } from "@bugbounty/shared/contracts";
 import { connectPreferredWallet, getActiveWalletAccount, getWalletAccounts, requestWalletAccounts, signMessage } from "../lib/wallet";
+import { waitForTransactionReceipt, writeContractAction } from "../lib/wallet";
 
 type Session = {
   address: string;
@@ -126,18 +128,48 @@ function ApproveCompanyForm() {
   );
 }
 
-function RegisterArbitratorForm() {
+function RegisterArbitratorForm({ onRegistered }: { onRegistered(): Promise<unknown> }) {
   const [address, setAddress] = useState("");
-  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   return (
     <form onSubmit={async (event) => {
       event.preventDefault();
-      const response = await api<{ address: string }>("/admin/arbitrators", {
-        method: "POST",
-        body: JSON.stringify({ address }),
-      });
-      setResult(`Árbitro incorporado: ${response.address}`);
+      try {
+        setSubmitting(true);
+        setError(null);
+        const sessionAddress = window.localStorage.getItem("bugbounty.admin.address");
+        if (!sessionAddress) {
+          throw new Error("No hay sesión admin activa.");
+        }
+        const response = await api<{
+          address: string;
+          nextAction: { contract: `0x${string}`; method: string; args: [string] };
+        }>("/admin/arbitrators", {
+          method: "POST",
+          body: JSON.stringify({ address }),
+        });
+        const hash = await writeContractAction({
+          address: response.nextAction.contract,
+          abi: disputeAbi,
+          functionName: response.nextAction.method,
+          args: response.nextAction.args,
+          account: sessionAddress as `0x${string}`,
+        });
+        await waitForTransactionReceipt(hash);
+        try {
+          await api("/admin/sync", { method: "POST" });
+        } catch (caught) {
+          console.error("admin sync after arbitrator register failed", caught);
+        }
+        setAddress("");
+        await onRegistered();
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "No pudimos incorporar al árbitro");
+      } finally {
+        setSubmitting(false);
+      }
     }}>
       <div className="form-header">
         <span className="eyebrow">Jury access</span>
@@ -147,8 +179,8 @@ function RegisterArbitratorForm() {
         <span>Wallet</span>
         <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="0x..." />
       </label>
-      <button type="submit">Incorporar</button>
-      {result ? <p>{result}</p> : null}
+      <button disabled={submitting} type="submit">{submitting ? "Incorporando..." : "Incorporar"}</button>
+      {error ? <p className="danger">{error}</p> : null}
     </form>
   );
 }
@@ -163,8 +195,12 @@ function SyncPanel() {
         <h2>Sincronizar</h2>
       </div>
       <button onClick={async () => {
-        const response = await api<{ synced: boolean; bountyLogs?: number; disputeLogs?: number }>("/admin/sync", { method: "POST" });
-        setStatus(response.synced ? `${response.bountyLogs ?? 0} programas, ${response.disputeLogs ?? 0} disputas` : "Configuración incompleta");
+        try {
+          const response = await api<{ synced: boolean; bountyLogs?: number; disputeLogs?: number; reason?: string }>("/admin/sync", { method: "POST" });
+          setStatus(response.synced ? `${response.bountyLogs ?? 0} programas, ${response.disputeLogs ?? 0} disputas` : response.reason ?? "Configuración incompleta");
+        } catch (caught) {
+          setStatus(caught instanceof Error ? caught.message : "No pudimos sincronizar");
+        }
       }}>Actualizar estado</button>
       {status ? <p>{status}</p> : null}
     </div>
@@ -245,7 +281,27 @@ export default function AdminPage() {
     try {
       setPendingArbitratorRemoval(address);
       setOverviewError(null);
-      await api(`/admin/arbitrators/${address}`, { method: "DELETE" });
+      const sessionAddress = window.localStorage.getItem("bugbounty.admin.address");
+      if (!sessionAddress) {
+        throw new Error("No hay sesión admin activa.");
+      }
+      const response = await api<{
+        address: string;
+        nextAction: { contract: `0x${string}`; method: string; args: [string] };
+      }>(`/admin/arbitrators/${address}`, { method: "DELETE" });
+      const hash = await writeContractAction({
+        address: response.nextAction.contract,
+        abi: disputeAbi,
+        functionName: response.nextAction.method,
+        args: response.nextAction.args,
+        account: sessionAddress as `0x${string}`,
+      });
+      await waitForTransactionReceipt(hash);
+      try {
+        await api("/admin/sync", { method: "POST" });
+      } catch (caught) {
+        setOverviewError(caught instanceof Error ? `Árbitro quitado on-chain, pero la sincronización quedó pendiente: ${caught.message}` : "Árbitro quitado on-chain, pero la sincronización quedó pendiente");
+      }
       await loadOverview();
     } catch (caught) {
       setOverviewError(caught instanceof Error ? caught.message : "No pudimos quitar al árbitro");
@@ -285,7 +341,7 @@ export default function AdminPage() {
       {overviewError ? <p className="danger">{overviewError}</p> : null}
       <section className="ops-grid">
         <div className="panel critical"><ApproveCompanyForm /></div>
-        <div className="panel critical"><RegisterArbitratorForm /></div>
+        <div className="panel critical"><RegisterArbitratorForm onRegistered={loadOverview} /></div>
         <SyncPanel />
       </section>
       <section className="dashboard-grid">

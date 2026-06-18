@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { disputeResultLabels, disputeAbi } from "@bugbounty/shared/contracts";
 
 import { api } from "../lib/api";
-import { writeContractAction } from "../lib/wallet";
+import { waitForTransactionReceipt, writeContractAction } from "../lib/wallet";
 
 type Session = {
   address: string;
@@ -22,6 +22,7 @@ type Dispute = {
   id: string;
   status: string;
   result: string | null;
+  bounty_address?: string | null;
   bounty_title?: string | null;
   report_title?: string | null;
   report_description?: string | null;
@@ -38,6 +39,12 @@ export function ArbitratorPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingVoteId, setPendingVoteId] = useState<string | null>(null);
 
+  async function loadDisputes() {
+    const allDisputes = await api<Dispute[]>("/disputes");
+    setDisputes(allDisputes);
+    return allDisputes;
+  }
+
   useEffect(() => {
     async function load() {
       try {
@@ -52,9 +59,7 @@ export function ArbitratorPanel() {
 
         const me = await api<Session>("/me");
         setSession(me);
-
-        const allDisputes = await api<Dispute[]>("/disputes");
-        setDisputes(allDisputes);
+        await loadDisputes();
       } catch (caught) {
         window.localStorage.removeItem("bugbounty.token");
         window.localStorage.removeItem("bugbounty.role");
@@ -106,6 +111,49 @@ export function ArbitratorPanel() {
         args: intent.nextAction.args,
         account: session.address as `0x${string}`,
       });
+      await waitForTransactionReceipt(hash);
+
+      if (dispute.bounty_address) {
+        try {
+          await api(`/bounties/${dispute.bounty_address}/sync`, { method: "POST" });
+        } catch (caught) {
+          console.error("dispute sync after vote failed", caught);
+        }
+      }
+      const updatedDisputes = await loadDisputes();
+      const updatedDispute = updatedDisputes.find((entry) => entry.id === dispute.id);
+      const upheldVotes = updatedDispute?.votes?.filter((vote) => vote.vote_result === "UPHELD").length ?? 0;
+      const dismissedVotes = updatedDispute?.votes?.filter((vote) => vote.vote_result === "DISMISSED").length ?? 0;
+
+      if (updatedDispute && updatedDispute.status !== "FINALIZED" && (upheldVotes >= 2 || dismissedVotes >= 2)) {
+        const finalizeIntent = await api<{
+          nextAction: {
+            contract: `0x${string}`;
+            method: string;
+            args: [bigint | number | string];
+          };
+        }>(`/disputes/${updatedDispute.id}/finalize-intent`, {
+          method: "POST",
+        });
+        const finalizeHash = await writeContractAction({
+          address: finalizeIntent.nextAction.contract,
+          abi: disputeAbi,
+          functionName: finalizeIntent.nextAction.method,
+          args: finalizeIntent.nextAction.args,
+          account: session.address as `0x${string}`,
+        });
+        await waitForTransactionReceipt(finalizeHash);
+        if (updatedDispute.bounty_address) {
+          try {
+            await api(`/bounties/${updatedDispute.bounty_address}/sync`, { method: "POST" });
+          } catch (caught) {
+            console.error("dispute sync after finalize failed", caught);
+          }
+        }
+        await loadDisputes();
+        setNotice(`Voto y cierre enviados correctamente. Referencia: ${finalizeHash}`);
+        return;
+      }
 
       setNotice(`Voto enviado correctamente. Referencia: ${hash}`);
     } catch (caught) {

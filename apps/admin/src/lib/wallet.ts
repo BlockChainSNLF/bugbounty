@@ -1,3 +1,5 @@
+import { createPublicClient, custom, encodeFunctionData, type Abi } from "viem";
+
 declare global {
   interface Window {
     ethereum?: {
@@ -11,6 +13,17 @@ declare global {
 
 function normalizeAccounts(accounts: unknown) {
   return (accounts as string[]).map((entry) => entry.toLowerCase());
+}
+
+function getErrorMessage(caught: unknown) {
+  return caught instanceof Error ? caught.message : String(caught);
+}
+
+function normalizeHexQuantity(value: unknown) {
+  if (typeof value !== "string" || !value.startsWith("0x")) {
+    return null;
+  }
+  return BigInt(value);
 }
 
 export async function connectWallet() {
@@ -76,4 +89,87 @@ export async function signMessage(address: string, message: string) {
     method: "personal_sign",
     params: [message, address],
   }) as Promise<`0x${string}`>;
+}
+
+export async function writeContractAction(parameters: {
+  address: `0x${string}`;
+  abi: Abi;
+  functionName: string;
+  args: readonly unknown[];
+  account: `0x${string}`;
+  gas?: bigint;
+}) {
+  if (!window.ethereum) {
+    throw new Error("No wallet provider found");
+  }
+
+  const data = encodeFunctionData({
+    abi: parameters.abi,
+    functionName: parameters.functionName,
+    args: parameters.args,
+  });
+
+  const baseTransaction = {
+    from: parameters.account,
+    to: parameters.address,
+    data,
+  };
+
+  let estimatedGas: bigint | null = null;
+  try {
+    estimatedGas = normalizeHexQuantity(await window.ethereum.request({
+      method: "eth_estimateGas",
+      params: [baseTransaction],
+    }));
+  } catch {
+    estimatedGas = null;
+  }
+
+  const bufferedEstimatedGas = estimatedGas ? (estimatedGas * 12n) / 10n : null;
+  const requestedGas = parameters.gas ?? null;
+  const gas = requestedGas && bufferedEstimatedGas
+    ? requestedGas > bufferedEstimatedGas ? requestedGas : bufferedEstimatedGas
+    : requestedGas ?? bufferedEstimatedGas;
+
+  const buildTransaction = (includeGas: boolean) => ({
+    ...baseTransaction,
+    ...(includeGas && gas ? { gas: `0x${gas.toString(16)}` } : {}),
+  });
+
+  let hash: unknown;
+  try {
+    hash = await window.ethereum.request({
+      method: "eth_sendTransaction",
+      params: [buildTransaction(Boolean(gas))],
+    });
+  } catch (caught) {
+    const message = getErrorMessage(caught).toLowerCase();
+    if (
+      !gas ||
+      (!message.includes("gas limit too high") &&
+        !message.includes("intrinsic gas too low") &&
+        !message.includes("out of gas"))
+    ) {
+      throw caught;
+    }
+
+    hash = await window.ethereum.request({
+      method: "eth_sendTransaction",
+      params: [buildTransaction(false)],
+    });
+  }
+
+  return hash as `0x${string}`;
+}
+
+export async function waitForTransactionReceipt(hash: `0x${string}`) {
+  if (!window.ethereum) {
+    throw new Error("No wallet provider found");
+  }
+
+  const publicClient = createPublicClient({
+    transport: custom(window.ethereum),
+  });
+
+  return publicClient.waitForTransactionReceipt({ hash });
 }

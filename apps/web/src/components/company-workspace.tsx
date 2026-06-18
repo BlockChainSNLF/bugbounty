@@ -14,6 +14,7 @@ export function CompanyWorkspace() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -69,14 +70,14 @@ export function CompanyWorkspace() {
   return (
     <>
       <div className="workspace-grid">
-        <div className="panel panel-wide"><RegisterBountyForm /></div>
+        <div className="panel panel-wide"><RegisterBountyForm onCreated={async () => { setRefreshKey((current) => current + 1); }} /></div>
         <div className="status-rail">
           <div><span>Escrow</span><strong>Deploy con wallet</strong></div>
           <div><span>Validacion</span><strong>On-chain</strong></div>
           <div><span>Disputas</span><strong>Arbitraje 3/3</strong></div>
         </div>
       </div>
-      <CompanyBountiesPanel />
+      <CompanyBountiesPanel refreshKey={refreshKey} />
     </>
   );
 }

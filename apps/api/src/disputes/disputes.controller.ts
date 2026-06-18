@@ -29,4 +29,13 @@ export class DisputesController {
     const session = await this.authService.requireRole(authorization, ["arbitrator", "admin"]);
     return this.disputesService.buildVoteIntent(id, session.address, body.voteResult);
   }
+
+  @Post(":id/finalize-intent")
+  async finalizeIntent(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+  ) {
+    const session = await this.authService.requireRole(authorization, ["arbitrator", "admin"]);
+    return this.disputesService.buildFinalizeIntent(id, session.address);
+  }
 }

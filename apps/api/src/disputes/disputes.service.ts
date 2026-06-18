@@ -84,11 +84,34 @@ export class DisputesService {
     };
   }
 
+  async buildFinalizeIntent(id: string, actorAddress: string) {
+    const dispute = await this.getById(id);
+    const assigned = Array.isArray(dispute.assignedArbitrators) ? dispute.assignedArbitrators as string[] : [];
+    if (!assigned.includes(actorAddress.toLowerCase())) {
+      throw new ForbiddenException("This account is not assigned to this dispute");
+    }
+
+    return {
+      disputeId: id,
+      actorAddress,
+      nextAction: {
+        contract: process.env.DISPUTE_ADDRESS,
+        method: "finalizeDispute",
+        args: [String(dispute.dispute_id_on_chain)],
+      },
+    };
+  }
+
   private async enrichDispute(dispute: DisputeDetails) {
+    const votes = await this.db.query(
+      "select arbitrator_address, vote_result, created_at from arbitrator_votes where dispute_id = $1 order by created_at asc",
+      [dispute.id],
+    );
     const assignedArbitrators = await this.getAssignedArbitrators(dispute.dispute_id_on_chain);
     return {
       ...dispute,
       assignedArbitrators,
+      votes: votes.rows,
     };
   }
 

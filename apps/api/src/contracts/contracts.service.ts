@@ -8,9 +8,11 @@ import { DatabaseService } from "../db/database.service.js";
 @Injectable()
 export class ContractsService implements OnModuleInit {
   private readonly logger = new Logger(ContractsService.name);
-  private readonly pollIntervalMs = Number(process.env.SYNC_INTERVAL_MS ?? 10000);
-  private readonly maxLogRange = BigInt(process.env.MAX_LOG_RANGE ?? 10);
+  private readonly pollIntervalMs = Number(process.env.SYNC_INTERVAL_MS ?? 30000);
+  private readonly maxLogRange = BigInt(process.env.MAX_LOG_RANGE ?? 9);
+  private readonly maxChunksPerSync = Number(process.env.MAX_CHUNKS_PER_SYNC ?? 20);
   private timer?: NodeJS.Timeout;
+  private syncPromise: Promise<{ synced: boolean; bountyLogs?: number; disputeLogs?: number; reason?: string }> | null = null;
 
   constructor(private readonly db: DatabaseService) {}
 
@@ -25,6 +27,19 @@ export class ContractsService implements OnModuleInit {
   }
 
   async syncConfiguredContracts() {
+    if (this.syncPromise) {
+      return this.syncPromise;
+    }
+
+    this.syncPromise = this.performConfiguredSync();
+    try {
+      return await this.syncPromise;
+    } finally {
+      this.syncPromise = null;
+    }
+  }
+
+  private async performConfiguredSync() {
     const disputeAddress = process.env.DISPUTE_ADDRESS as `0x${string}` | undefined;
     if (!disputeAddress) {
       return { synced: false, reason: "DISPUTE_ADDRESS missing" };
@@ -37,12 +52,14 @@ export class ContractsService implements OnModuleInit {
     const bountyRows = await this.db.query<{ address: string }>(
       "select address from bounties order by created_at asc",
     );
+    const latestBlock = await client.getBlockNumber();
 
     let bountyLogs = 0;
     for (const row of bountyRows.rows) {
-      bountyLogs += await this.syncContract(client, row.address as `0x${string}`, bountyAbi);
+      bountyLogs += await this.syncContract(client, row.address as `0x${string}`, bountyAbi, latestBlock);
     }
-    const disputeLogs = await this.syncContract(client, disputeAddress, disputeAbi);
+    const disputeLogs = await this.syncContract(client, disputeAddress, disputeAbi, latestBlock);
+    await this.reconcileArbitrators(client, disputeAddress);
 
     return {
       synced: true,
@@ -60,9 +77,11 @@ export class ContractsService implements OnModuleInit {
     const client = createPublicClient({
       transport: http(process.env.RPC_URL),
     });
+    const latestBlock = await client.getBlockNumber();
 
-    const bountyLogs = await this.syncContract(client, bountyAddress, bountyAbi);
-    const disputeLogs = await this.syncContract(client, disputeAddress, disputeAbi);
+    const bountyLogs = await this.syncContract(client, bountyAddress, bountyAbi, latestBlock);
+    const disputeLogs = await this.syncContract(client, disputeAddress, disputeAbi, latestBlock);
+    await this.reconcileArbitrators(client, disputeAddress);
 
     return {
       synced: true,
@@ -71,27 +90,49 @@ export class ContractsService implements OnModuleInit {
     };
   }
 
-  private async syncContract(client: ReturnType<typeof createPublicClient>, address: `0x${string}`, abi: typeof bountyAbi | typeof disputeAbi) {
+  private async syncContract(
+    client: ReturnType<typeof createPublicClient>,
+    address: `0x${string}`,
+    abi: typeof bountyAbi | typeof disputeAbi,
+    latestBlock: bigint,
+  ) {
     const state = await this.db.query<{ last_block: string }>(
       "select last_block from contract_sync_state where contract_address = $1",
       [address.toLowerCase()],
     );
-    const fromBlock = BigInt(state.rows[0]?.last_block ?? process.env.START_BLOCK ?? 0);
-    const latestBlock = await client.getBlockNumber();
+    const hasState = Boolean(state.rows[0]);
+    const previousLastBlock = BigInt(state.rows[0]?.last_block ?? process.env.START_BLOCK ?? 0);
+    let cursor = hasState ? previousLastBlock + 1n : previousLastBlock;
+    let lastProcessedBlock = previousLastBlock;
     const logs = [];
 
-    for (let cursor = fromBlock; cursor <= latestBlock; cursor += this.maxLogRange) {
+    if (cursor > latestBlock) {
+      return 0;
+    }
+
+    for (let chunks = 0; cursor <= latestBlock && chunks < this.maxChunksPerSync; chunks += 1) {
       const toBlock = cursor + (this.maxLogRange - 1n) > latestBlock
         ? latestBlock
         : cursor + (this.maxLogRange - 1n);
 
-      const chunk = await client.getLogs({
-        address,
-        fromBlock: cursor,
-        toBlock,
-      });
+      let chunk;
+      try {
+        chunk = await client.getLogs({
+          address,
+          fromBlock: cursor,
+          toBlock,
+        });
+      } catch (error) {
+        if (!this.isRateLimitError(error)) {
+          throw error;
+        }
+        this.logger.warn(`sync throttled for ${address} at blocks ${cursor}-${toBlock}`);
+        break;
+      }
 
       logs.push(...chunk);
+      lastProcessedBlock = toBlock;
+      cursor = toBlock + 1n;
     }
 
     for (const log of logs) {
@@ -121,14 +162,36 @@ export class ContractsService implements OnModuleInit {
       `insert into contract_sync_state (contract_address, last_block)
        values ($1, $2)
        on conflict (contract_address) do update set last_block = excluded.last_block`,
-      [address.toLowerCase(), latestBlock.toString()],
+      [address.toLowerCase(), lastProcessedBlock.toString()],
     );
 
     return logs.length;
   }
 
+  private isRateLimitError(error: unknown) {
+    const message = String(error).toLowerCase();
+    return message.includes("429") || message.includes("too many requests");
+  }
+
   private async projectState(address: string, eventName: string, args: Record<string, unknown>) {
     switch (eventName) {
+      case "ArbitratorRegistered":
+        await this.db.query(
+          `insert into users (address, role, company_approved)
+           values ($1, 'arbitrator', false)
+           on conflict (address) do update
+           set role = 'arbitrator'`,
+          [String(args.arbitrator).toLowerCase()],
+        );
+        break;
+      case "ArbitratorRemoved":
+        await this.db.query(
+          `delete from users
+           where address = $1
+             and role = 'arbitrator'`,
+          [String(args.arbitrator).toLowerCase()],
+        );
+        break;
       case "ReportSubmitted":
         await this.db.query(
           `update reports
@@ -228,5 +291,45 @@ export class ContractsService implements OnModuleInit {
     return JSON.parse(
       JSON.stringify(args, (_, value) => (typeof value === "bigint" ? value.toString() : value)),
     ) as Record<string, unknown>;
+  }
+
+  private async reconcileArbitrators(
+    client: ReturnType<typeof createPublicClient>,
+    disputeAddress: `0x${string}`,
+  ) {
+    const onChainArbitrators = (await client.readContract({
+      address: disputeAddress,
+      abi: disputeAbi,
+      functionName: "getArbitrators",
+    })).map((address) => address.toLowerCase());
+
+    const localArbitrators = await this.db.query<{ address: string }>(
+      `select address
+       from users
+       where role = 'arbitrator'`,
+    );
+    const localSet = new Set(localArbitrators.rows.map((row) => row.address.toLowerCase()));
+    const onChainSet = new Set(onChainArbitrators);
+
+    for (const address of onChainArbitrators) {
+      await this.db.query(
+        `insert into users (address, role, company_approved)
+         values ($1, 'arbitrator', false)
+         on conflict (address) do update
+         set role = 'arbitrator'`,
+        [address],
+      );
+    }
+
+    for (const address of localSet) {
+      if (!onChainSet.has(address)) {
+        await this.db.query(
+          `delete from users
+           where address = $1
+             and role = 'arbitrator'`,
+          [address],
+        );
+      }
+    }
   }
 }

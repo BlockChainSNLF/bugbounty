@@ -5,6 +5,8 @@ cd Contracts
 npm install
 cd ..
 docker compose up -d postgres
+
+docker start bugbounty-postgres
 ```
 
 ```bash

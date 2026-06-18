@@ -15,6 +15,20 @@ function normalizeAccounts(accounts: unknown) {
   return (accounts as string[]).map((entry) => entry.toLowerCase());
 }
 
+function getErrorMessage(caught: unknown) {
+  return caught instanceof Error ? caught.message : String(caught);
+}
+
+function normalizeHexQuantity(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  if (!value.startsWith("0x")) {
+    return null;
+  }
+  return BigInt(value);
+}
+
 export async function connectWallet() {
   if (!window.ethereum) {
     throw new Error("No wallet provider found");
@@ -135,22 +149,47 @@ export async function writeContractAction(parameters: {
     args: parameters.args,
   });
 
-  const buildTransaction = (includeGas: boolean) => ({
+  const baseTransaction = {
     from: parameters.account,
     to: parameters.address,
     data,
-    ...(includeGas && parameters.gas ? { gas: `0x${parameters.gas.toString(16)}` } : {}),
+  };
+
+  let estimatedGas: bigint | null = null;
+  try {
+    estimatedGas = normalizeHexQuantity(await window.ethereum.request({
+      method: "eth_estimateGas",
+      params: [baseTransaction],
+    }));
+  } catch {
+    estimatedGas = null;
+  }
+
+  const bufferedEstimatedGas = estimatedGas ? (estimatedGas * 12n) / 10n : null;
+  const requestedGas = parameters.gas ?? null;
+  const gas = requestedGas && bufferedEstimatedGas
+    ? requestedGas > bufferedEstimatedGas ? requestedGas : bufferedEstimatedGas
+    : requestedGas ?? bufferedEstimatedGas;
+
+  const buildTransaction = (includeGas: boolean) => ({
+    ...baseTransaction,
+    ...(includeGas && gas ? { gas: `0x${gas.toString(16)}` } : {}),
   });
 
   let hash: unknown;
   try {
     hash = await window.ethereum.request({
       method: "eth_sendTransaction",
-      params: [buildTransaction(true)],
+      params: [buildTransaction(Boolean(gas))],
     });
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
-    if (!parameters.gas || !message.toLowerCase().includes("gas limit too high")) {
+    const message = getErrorMessage(caught).toLowerCase();
+    if (
+      !gas ||
+      (!message.includes("gas limit too high") &&
+        !message.includes("intrinsic gas too low") &&
+        !message.includes("out of gas"))
+    ) {
       throw caught;
     }
 
