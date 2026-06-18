@@ -1,0 +1,17 @@
+{
+  "name": "bugbounty-mvp",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:shared": "npm --workspace @bugbounty/shared run build",
+    "dev:api": "npm --workspace @bugbounty/api run dev",
+    "dev:admin": "npm --workspace @bugbounty/admin run dev",
+    "dev:web": "npm --workspace @bugbounty/web run dev",
+    "build": "npm run build:shared && npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

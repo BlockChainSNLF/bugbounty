@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-6ccbee4f91b4bcd3fe4616000964bd903884f935",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.5.0"
+  },
+  "userSourceNameMap": {
+    "contracts/Bounty.sol": "project/contracts/Bounty.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Bounty.sol": {
+        "content": "// SPDX-License-Identifier: UNLICENSED\npragma solidity ^0.8.28;\n\nenum DisputeResult { UPHELD, DISMISSED }\n\ninterface IDisputeContract {\n    function submitDispute(uint256 reportId, bytes32 reportHash, address hunter) external returns (DisputeResult);\n}\n\ncontract Bounty {\n    enum Status { OPEN, CANCELLED, CLOSED }\n    enum ReportStatus { PENDING, ACCEPTED, REJECTED, DISPUTED, RESOLVED }\n\n    event BountyCreated(address indexed company, uint256 reward);\n    event BountyCancelled();\n    event BountyClosed(uint256 indexed reportId, address indexed hunter);\n    event ReportSubmitted(uint256 indexed reportId, address indexed hunter);\n    event ReportAccepted(uint256 indexed reportId, address indexed hunter);\n    event ReportRejected(uint256 indexed reportId, address indexed hunter);\n    event ReportDisputed(uint256 indexed reportId, address indexed hunter);\n    event DisputeResolved(uint256 indexed reportId, DisputeResult result);\n\n    struct Report {\n        address hunter;\n        bytes32 hash;\n        ReportStatus status;\n        uint256 timestamp;\n        uint256 rejectedAt;\n    }\n\n    address public company;\n    uint256 public reward;\n    Status public status;\n    uint8 public activeReports;\n    mapping(uint256 => Report) public reports;\n    uint256 public reportCount;\n    uint256 public oldestPendingReport;\n    uint256 public lastRejectedAt;\n    uint256 public constant DISPUTE_WINDOW = 3 days;\n    IDisputeContract public disputeContract;\n\n\n    constructor(address _disputeContract) payable {\n        require(msg.value > 0, \"Insufficient funds to open bounty\");\n        require(_disputeContract != address(0), \"Invalid dispute contract\");\n        reward = msg.value;\n        company = msg.sender;\n        status = Status.OPEN;\n        disputeContract = IDisputeContract(_disputeContract);\n        emit BountyCreated(msg.sender, msg.value);\n    }\n\n    modifier onlyCompany() {\n        require(msg.sender == company, \"Only the company can perform this action\");\n        _;\n    }\n\n    modifier onlyOldestPending(uint reportId) {\n        require(reportId == oldestPendingReport, \"Must resolve reports in order\");\n        _;\n    }\n\n    modifier openBounty() {\n        require(status == Status.OPEN, \"Bounty must be open\");\n        _;\n    }\n\n    function cancelBounty() external onlyCompany openBounty {\n        require(activeReports == 0, \"Cannot cancel with active reports\");\n        require(block.timestamp > lastRejectedAt + DISPUTE_WINDOW, \"Dispute window still active\");\n        status = Status.CANCELLED;\n        emit BountyCancelled();\n        payable(company).transfer(address(this).balance);\n    }\n\n    function getBalance() external view returns (uint) {\n        return address(this).balance;\n    }\n\n    function submitReport(bytes32 reportHash) external openBounty {\n        require(msg.sender != company, \"Company cannot submit reports\");\n        reports[reportCount] = Report({\n            hunter: msg.sender,\n            hash: reportHash,\n            status: ReportStatus.PENDING,\n            timestamp: block.timestamp,\n            rejectedAt: 0\n        });\n        emit ReportSubmitted(reportCount, msg.sender);\n        reportCount++;\n        activeReports++;\n    }\n\n    function getReport(uint reportId) external view returns (Report memory) {\n        require(reportId < reportCount, \"Report does not exist\");\n        return reports[reportId];\n    }\n\n    function acceptReport(uint reportId) external onlyCompany openBounty onlyOldestPending(reportId) {\n        Report storage report = reports[reportId];\n        require(report.status == ReportStatus.PENDING, \"Report must be pending\");\n        require(block.timestamp > lastRejectedAt + DISPUTE_WINDOW, \"Dispute window still active\");\n        report.status = ReportStatus.ACCEPTED;\n        activeReports--;\n        oldestPendingReport++;\n        status = Status.CLOSED;\n        emit ReportAccepted(reportId, report.hunter);\n        emit BountyClosed(reportId, report.hunter);\n        payable(report.hunter).transfer(reward);\n    }\n\n    function rejectReport(uint reportId) external onlyCompany openBounty onlyOldestPending(reportId) {\n        Report storage report = reports[reportId];\n        require(report.status == ReportStatus.PENDING, \"Report must be pending\");\n        report.status = ReportStatus.REJECTED;\n        report.rejectedAt = block.timestamp;\n        lastRejectedAt = block.timestamp;\n        activeReports--;\n        oldestPendingReport++;\n        emit ReportRejected(reportId, report.hunter);\n    }\n\n    function disputeReport(uint reportId) external openBounty {\n        Report storage report = reports[reportId];\n        require(report.hunter == msg.sender, \"Only the hunter can dispute\");\n        require(report.status == ReportStatus.REJECTED, \"Report must be rejected\");\n        require(block.timestamp <= report.rejectedAt + DISPUTE_WINDOW, \"Dispute window has expired\");\n        report.status = ReportStatus.DISPUTED;\n        emit ReportDisputed(reportId, msg.sender);\n        DisputeResult result = disputeContract.submitDispute(reportId, report.hash, report.hunter);\n        emit DisputeResolved(reportId, result);\n        if (result == DisputeResult.UPHELD) {\n            report.status = ReportStatus.ACCEPTED;\n            status = Status.CLOSED;\n            emit BountyClosed(reportId, report.hunter);\n            payable(report.hunter).transfer(reward);\n        } else {\n            report.status = ReportStatus.RESOLVED;\n        }\n    }\n\n}\n"
+      }
+    }
+  }
+}
