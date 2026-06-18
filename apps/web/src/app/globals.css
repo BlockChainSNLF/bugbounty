@@ -393,6 +393,13 @@ button:disabled {
   font-size: 0.82rem;
 }
 
+.session-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .session-pill-muted {
   color: var(--muted);
 }
@@ -401,6 +408,12 @@ button:disabled {
   color: var(--acid);
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.session-exit {
+  width: auto;
+  min-width: 0;
+  padding: 8px 10px;
 }
 
 .mono {

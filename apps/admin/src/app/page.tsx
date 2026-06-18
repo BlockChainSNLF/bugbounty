@@ -203,7 +203,22 @@ export default function AdminPage() {
           <span className="eyebrow">Admin only</span>
           <h1>Control room</h1>
         </div>
-        <div className="session-pill">{session.address}</div>
+        <div className="session-cluster">
+          <div className="session-pill">{session.address}</div>
+          <button
+            className="session-exit"
+            onClick={() => {
+              window.localStorage.removeItem("bugbounty.admin.token");
+              window.localStorage.removeItem("bugbounty.admin.address");
+              setOverview(null);
+              setOverviewError(null);
+              setSession(null);
+            }}
+            type="button"
+          >
+            Salir
+          </button>
+        </div>
       </header>
       {overviewError ? <p className="danger">{overviewError}</p> : null}
       <section className="ops-grid">

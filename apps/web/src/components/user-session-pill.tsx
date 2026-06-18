@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { SESSION_EVENT, getStoredSession } from "../lib/session";
+import { SESSION_EVENT, clearStoredSession, getStoredSession } from "../lib/session";
 
 export function UserSessionPill() {
   const [session, setSession] = useState<{ address: string; role: string } | null>(null);
@@ -27,9 +27,21 @@ export function UserSessionPill() {
   }
 
   return (
-    <div className="session-pill">
-      <span className="session-role">{session.role}</span>
-      <span className="mono">{session.address}</span>
+    <div className="session-cluster">
+      <div className="session-pill">
+        <span className="session-role">{session.role}</span>
+        <span className="mono">{session.address}</span>
+      </div>
+      <button
+        className="session-exit"
+        onClick={() => {
+          clearStoredSession();
+          setSession(null);
+        }}
+        type="button"
+      >
+        Salir
+      </button>
     </div>
   );
 }

@@ -160,6 +160,18 @@ button:disabled {
   font-size: 0.82rem;
 }
 
+.session-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-exit {
+  width: auto;
+  min-width: 0;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
