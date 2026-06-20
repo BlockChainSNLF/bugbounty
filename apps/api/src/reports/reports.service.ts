@@ -36,6 +36,7 @@ export class ReportsService {
     attachments: AttachmentDto[];
   }) {
     const id = randomUUID();
+    const normalizedAuthorAddress = payload.authorAddress.toLowerCase();
     const bounty = await this.db.query<{ address: string; company_address: string }>(
       "select address, company_address from bounties where address = $1",
       [payload.bountyAddress.toLowerCase()],
@@ -57,7 +58,7 @@ export class ReportsService {
       [
         id,
         payload.bountyAddress.toLowerCase(),
-        payload.authorAddress,
+        normalizedAuthorAddress,
         payload.title,
         payload.description,
         payload.poc,
@@ -135,6 +136,7 @@ export class ReportsService {
   }
 
   async createSubmitIntent(id: string, actorAddress: string) {
+    const normalizedActorAddress = actorAddress.toLowerCase();
     const report = await this.db.query<{
       id: string;
       bounty_address: string;
@@ -153,14 +155,14 @@ export class ReportsService {
     if (!row) {
       throw new NotFoundException("Report not found");
     }
-    if (row.author_address.toLowerCase() !== actorAddress.toLowerCase()) {
+    if (row.author_address.toLowerCase() !== normalizedActorAddress) {
       throw new NotFoundException("Report not found for this hunter");
     }
     const bounty = await this.db.query<{ company_address: string }>(
       "select company_address from bounties where address = $1",
       [row.bounty_address.toLowerCase()],
     );
-    if (bounty.rows[0]?.company_address?.toLowerCase() === actorAddress.toLowerCase()) {
+    if (bounty.rows[0]?.company_address?.toLowerCase() === normalizedActorAddress) {
       throw new ForbiddenException("La empresa no puede reportar vulnerabilidades en su propio bounty.");
     }
     if (row.report_id_on_chain !== null || row.status !== "OFFCHAIN_STORED") {
@@ -179,6 +181,7 @@ export class ReportsService {
   }
 
   async createResolutionIntent(id: string, actorAddress: string, action: "accept" | "reject") {
+    const normalizedActorAddress = actorAddress.toLowerCase();
     const report = await this.db.query<{
       id: string;
       bounty_address: string;
@@ -197,7 +200,7 @@ export class ReportsService {
     if (!row) {
       throw new NotFoundException("Report not found");
     }
-    if (row.company_address.toLowerCase() !== actorAddress.toLowerCase()) {
+    if (row.company_address.toLowerCase() !== normalizedActorAddress) {
       throw new NotFoundException("Report not found for this company");
     }
     if (row.report_id_on_chain === null) {
