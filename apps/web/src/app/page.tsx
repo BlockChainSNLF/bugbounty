@@ -11,6 +11,9 @@ const ROLE_HOME: Record<string, string> = {
   hunter: "/hunter",
   company: "/company",
   arbitrator: "/arbitrator",
+  // La wallet admin se resuelve como "admin" en el backend (ADMIN_WALLET) aunque
+  // también sea empresa aprobada; en la web la llevamos a su workspace de empresa.
+  admin: "/company",
 };
 
 const STEPS = [
