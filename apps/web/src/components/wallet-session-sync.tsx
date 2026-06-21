@@ -1,10 +1,18 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 
 import { CHAIN_ID } from "../lib/wagmi";
 import { clearStoredSession, ensureWalletSession, getStoredSession } from "../lib/session";
+
+// Cada rol tiene su workspace; al cambiar de cuenta re-ruteamos al que corresponde.
+const ROLE_HOME: Record<string, string> = {
+  hunter: "/hunter",
+  company: "/company",
+  arbitrator: "/arbitrator",
+};
 
 /**
  * Keeps the backend session aligned with the wallet connected through wagmi.
@@ -13,6 +21,7 @@ import { clearStoredSession, ensureWalletSession, getStoredSession } from "../li
  */
 export function WalletSessionSync() {
   const { address, chainId, isConnected, status } = useAccount();
+  const router = useRouter();
   const lastLoggedIn = useRef<string | null>(null);
 
   useEffect(() => {
@@ -41,12 +50,21 @@ export function WalletSessionSync() {
     if (lastLoggedIn.current === normalized) {
       return;
     }
+    // Si veníamos logueados con OTRA cuenta, esto es un switch: re-ruteamos al
+    // workspace del rol de la cuenta nueva (la vista no debe quedar en la anterior).
+    const switchedFrom = lastLoggedIn.current;
     lastLoggedIn.current = normalized;
-    void ensureWalletSession().catch(() => {
-      // User may reject the signature; protected actions will prompt again.
-      lastLoggedIn.current = null;
-    });
-  }, [address, chainId, isConnected, status]);
+    void ensureWalletSession()
+      .then((session) => {
+        if (switchedFrom && switchedFrom !== normalized) {
+          router.replace(ROLE_HOME[session.role] ?? "/");
+        }
+      })
+      .catch(() => {
+        // User may reject the signature; protected actions will prompt again.
+        lastLoggedIn.current = null;
+      });
+  }, [address, chainId, isConnected, status, router]);
 
   return null;
 }

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useDisconnect } from "wagmi";
 
 import { SESSION_EVENT, getStoredSession, refreshSessionAlias } from "../lib/session";
+import { getWalletAccounts, promptAccountSelection } from "../lib/wallet";
 import { explorerAddressUrl, shortHash } from "../lib/explorer";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -63,6 +64,31 @@ function AliasEditor({ current, onClose }: { current: string | null; onClose: ()
   );
 }
 
+function AccountSwitcher({ activeAddress }: { activeAddress: string }) {
+  const [accounts, setAccounts] = useState<string[]>([]);
+
+  useEffect(() => {
+    setAccounts(getWalletAccounts());
+  }, []);
+
+  const others = accounts.filter((entry) => entry !== activeAddress.toLowerCase());
+  if (others.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="account-switch">
+      <span className="surface-kicker">Conectadas · cambiá en MetaMask</span>
+      {others.map((entry) => (
+        <div className="account-switch-row" key={entry}>
+          <span className="account-avatar">{initialsFor(null, entry)}</span>
+          <span className="account-name">{shortHash(entry)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AccountMenu({
   session,
   address,
@@ -85,6 +111,14 @@ function AccountMenu({
           <div className="account-menu-name">{alias || shortHash(address)}</div>
           <div className="account-menu-net"><span className="account-dot" />{roleLabel ? `${roleLabel} · Sepolia` : "Sepolia"}</div>
         </div>
+        <button
+          type="button"
+          className="account-add-btn"
+          title="Conectar otra cuenta"
+          onClick={() => void promptAccountSelection()}
+        >
+          +
+        </button>
       </div>
 
       {editing ? (
@@ -119,6 +153,8 @@ function AccountMenu({
               Explorer ↗
             </a>
           </div>
+
+          <AccountSwitcher activeAddress={address} />
 
           <button type="button" className="account-menu-item" onClick={() => setEditing(true)}>
             Editar alias

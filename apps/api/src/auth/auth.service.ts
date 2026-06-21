@@ -54,16 +54,49 @@ export class AuthService {
       alias: await this.getAlias(normalizedAddress),
     };
     this.sessions.set(session.token, session);
+    // Persistimos el token para que sobreviva reinicios de la API: así no hay que
+    // volver a firmar al cambiar de cuenta cada vez que el server se reinicia.
+    await this.db.query(
+      `insert into sessions (token, address) values ($1, $2)
+       on conflict (token) do nothing`,
+      [session.token, normalizedAddress],
+    );
 
     return session;
   }
 
   async requireSession(authHeader?: string) {
     const token = parseBearer(authHeader);
-    const session = this.sessions.get(token);
+    const cached = this.sessions.get(token);
+    if (cached) {
+      return cached;
+    }
+    const session = await this.restoreSession(token);
     if (!session) {
       throw new UnauthorizedException("Invalid session");
     }
+    return session;
+  }
+
+  /** Reconstruye una sesión desde la DB (token persistido) cuando no está en memoria. */
+  private async restoreSession(token: string): Promise<WalletSession | undefined> {
+    const result = await this.db.query<{ address: string }>(
+      "select address from sessions where token = $1",
+      [token],
+    );
+    const address = result.rows[0]?.address;
+    if (!address) {
+      return undefined;
+    }
+    const session: WalletSession = {
+      token,
+      address,
+      role: await this.resolveRole(address),
+      isAdmin: this.isAdminWallet(address),
+      companyApproved: await this.isCompanyApproved(address),
+      alias: await this.getAlias(address),
+    };
+    this.sessions.set(token, session);
     return session;
   }
 

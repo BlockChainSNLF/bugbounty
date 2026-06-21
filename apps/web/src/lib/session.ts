@@ -13,6 +13,26 @@ type Session = {
 
 const SESSION_EVENT = "bugbounty:session-changed";
 
+function cacheKey(address: string) {
+  return `bugbounty.session.${address.toLowerCase()}`;
+}
+
+/** Token cacheado por dirección: al volver a una wallet ya logueada no se vuelve a firmar. */
+function getCachedSession(address: string): Session | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const raw = window.localStorage.getItem(cacheKey(address));
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as Session;
+  } catch {
+    return null;
+  }
+}
+
 function saveSession(session: Session) {
   window.localStorage.setItem("bugbounty.token", session.token);
   window.localStorage.setItem("bugbounty.role", session.role);
@@ -22,6 +42,8 @@ function saveSession(session: Session) {
   } else {
     window.localStorage.removeItem("bugbounty.alias");
   }
+  // Cache por wallet (persiste aunque cambies de cuenta / desconectes).
+  window.localStorage.setItem(cacheKey(session.address), JSON.stringify(session));
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
@@ -88,8 +110,11 @@ export async function loginWithWallet(address: string) {
 let inFlight: { address: string; promise: Promise<Session> } | null = null;
 
 async function establishSession(address: string): Promise<Session> {
-  const stored = getStoredSession();
-  if (stored && stored.address.toLowerCase() === address) {
+  // Reusamos el token cacheado de esta wallet (si lo hay) y solo lo revalidamos
+  // contra /me; si sigue vivo, no se vuelve a pedir firma.
+  const cached = getCachedSession(address);
+  if (cached) {
+    saveSession(cached);
     try {
       const verified = await api<Session>("/me");
       if (verified.address.toLowerCase() === address) {
@@ -97,7 +122,7 @@ async function establishSession(address: string): Promise<Session> {
         return verified;
       }
     } catch {
-      clearStoredSession();
+      // Token vencido o backend reiniciado: firmamos de nuevo abajo.
     }
   }
   return loginWithWallet(address);

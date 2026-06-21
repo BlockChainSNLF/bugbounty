@@ -96,6 +96,12 @@ export class DatabaseService implements OnModuleInit {
         last_block bigint not null default 0
       );
 
+      create table if not exists sessions (
+        token text primary key,
+        address text not null,
+        created_at timestamptz not null default now()
+      );
+
       alter table users add column if not exists alias text;
       alter table bounties add column if not exists out_of_scope text not null default '';
     `);

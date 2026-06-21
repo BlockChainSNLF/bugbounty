@@ -357,6 +357,51 @@ h3 {
 .account-menu-danger:hover {
   background: rgba(255, 107, 129, 0.08);
 }
+
+.account-add-btn {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: 600 18px var(--font-body);
+  line-height: 1;
+}
+.account-add-btn:hover {
+  background: var(--accent-soft);
+}
+.account-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.account-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: 600 12px var(--font-body);
+  text-align: left;
+}
+.account-switch-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.account-switch-row .account-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .account-edit-form {
   display: grid;
   gap: 9px;
