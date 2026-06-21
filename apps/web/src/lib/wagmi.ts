@@ -1,17 +1,22 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { http } from "wagmi";
+import { connectorsForWallets } from "@rainbow-me/rainbowkit";
+import { injectedWallet } from "@rainbow-me/rainbowkit/wallets";
+import { createConfig, http } from "wagmi";
 import { sepolia } from "wagmi/chains";
 
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? "11155111");
 
-// WalletConnect projectId is required by RainbowKit's getDefaultConfig. Injected
-// wallets (MetaMask) work without a real one; set NEXT_PUBLIC_WC_PROJECT_ID to a
-// free WalletConnect Cloud id to enable WalletConnect/mobile wallets.
-const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID ?? "bugbounty-grid-local";
+// Solo wallet inyectada (MetaMask/Brave) sobre Sepolia. No usamos WalletConnect:
+// así no dependemos de un projectId de WalletConnect Cloud y evitamos el preload
+// del modal de WalletConnect, que crasheaba con projectId inválido
+// (getRecomendedWallets → Object.values(undefined)) y además metía ruido de
+// indexedDB/pino-pretty en el SSR.
+const connectors = connectorsForWallets(
+  [{ groupName: "Wallets", wallets: [injectedWallet] }],
+  { appName: "BugBounty Grid", projectId: "bugbounty-grid" },
+);
 
-export const wagmiConfig = getDefaultConfig({
-  appName: "BugBounty Grid",
-  projectId,
+export const wagmiConfig = createConfig({
+  connectors,
   chains: [sepolia],
   transports: {
     [sepolia.id]: http(process.env.NEXT_PUBLIC_RPC_URL || undefined),

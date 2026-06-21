@@ -2,6 +2,17 @@
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+import { SESSION_EVENT, getStoredSession } from "../lib/session";
+
+// Cada rol tiene su workspace; el hub es solo para usuarios sin sesión.
+const ROLE_HOME: Record<string, string> = {
+  hunter: "/hunter",
+  company: "/company",
+  arbitrator: "/arbitrator",
+};
 
 const STEPS = [
   {
@@ -29,6 +40,24 @@ const ROLES = [
 
 export default function HomePage() {
   const { openConnectModal } = useConnectModal();
+  const router = useRouter();
+
+  useEffect(() => {
+    const redirectIfLoggedIn = () => {
+      const session = getStoredSession();
+      const dest = session ? ROLE_HOME[session.role] : null;
+      if (dest) {
+        router.replace(dest);
+      }
+    };
+    redirectIfLoggedIn();
+    window.addEventListener(SESSION_EVENT, redirectIfLoggedIn);
+    window.addEventListener("storage", redirectIfLoggedIn);
+    return () => {
+      window.removeEventListener(SESSION_EVENT, redirectIfLoggedIn);
+      window.removeEventListener("storage", redirectIfLoggedIn);
+    };
+  }, [router]);
 
   return (
     <div className="page-grid">

@@ -36,6 +36,15 @@ body {
   font-family: var(--font-body);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+/* offset anchored sections so the sticky topbar doesn't cover them */
+section[id] {
+  scroll-margin-top: 88px;
+}
+
 body {
   background:
     radial-gradient(120% 90% at 85% -10%, rgba(56, 189, 248, 0.1), transparent 55%),
@@ -234,42 +243,131 @@ h3 {
   font: 500 10px var(--font-mono);
   color: var(--muted);
 }
-.account-edit {
-  width: auto;
-  padding: 0 11px;
-  border: none;
-  border-left: 1px solid var(--border);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 13px;
+.account-avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #04101f;
+  font: 700 10px var(--font-mono);
 }
-.account-edit:hover {
-  color: var(--accent);
+.account-chevron {
+  margin-left: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+.account-chevron-open {
+  transform: rotate(180deg);
 }
 
-.alias-pop {
+/* account dropdown */
+.account-menu {
   position: absolute;
   top: calc(100% + 9px);
   right: 0;
   z-index: 60;
   display: grid;
-  gap: 9px;
-  width: 256px;
-  padding: 14px;
+  gap: 8px;
+  width: 266px;
+  padding: 9px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 15px;
   background: var(--surface2);
+  backdrop-filter: blur(22px);
   box-shadow: 0 22px 54px rgba(0, 0, 0, 0.55);
 }
-.alias-pop input {
+.account-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 9px 4px;
+}
+.account-menu-head .account-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  font-size: 12px;
+}
+.account-menu-name {
+  font: 600 14px var(--font-body);
+  color: var(--ink);
+}
+.account-menu-net {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font: 500 10px var(--font-mono);
+  color: var(--muted);
+}
+.account-addr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.account-addr .mono {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  font: 500 12px var(--font-mono);
+  color: var(--ink);
+}
+.account-icon-btn {
+  flex: none;
+  white-space: nowrap;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: 500 11px var(--font-mono);
+}
+.account-icon-btn:hover {
+  color: var(--ink);
+}
+.account-menu-item {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: 600 12px var(--font-body);
+  text-align: left;
+}
+.account-menu-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.account-menu-danger {
+  color: var(--danger);
+}
+.account-menu-danger:hover {
+  background: rgba(255, 107, 129, 0.08);
+}
+.account-edit-form {
+  display: grid;
+  gap: 9px;
+  padding: 4px 2px 2px;
+}
+.account-edit-form input {
   padding: 10px 12px;
 }
-.alias-pop-actions {
+.account-edit-actions {
   display: flex;
   gap: 8px;
 }
-.alias-pop-actions button {
+.account-edit-actions button {
   padding: 9px 12px;
   font-size: 12px;
 }

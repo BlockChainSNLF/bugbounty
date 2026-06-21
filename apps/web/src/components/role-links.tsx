@@ -2,11 +2,12 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useDisconnect } from "wagmi";
 
 import { SESSION_EVENT, getStoredSession, refreshSessionAlias } from "../lib/session";
-import { shortHash } from "../lib/explorer";
+import { explorerAddressUrl, shortHash } from "../lib/explorer";
 
 const ROLE_LABELS: Record<string, string> = {
   company: "Empresa",
@@ -15,12 +16,12 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
 };
 
-const NAV = [
-  { href: "/", label: "Hub" },
-  { href: "/company", label: "Empresa" },
-  { href: "/hunter", label: "Hunter" },
-  { href: "/arbitrator", label: "Árbitro" },
-];
+type SessionInfo = { role: string; address: string; alias: string | null };
+
+function initialsFor(alias: string | null, address: string) {
+  const base = (alias?.trim() || address.replace(/^0x/i, "")).slice(0, 2);
+  return base.toUpperCase();
+}
 
 function AliasEditor({ current, onClose }: { current: string | null; onClose: () => void }) {
   const [value, setValue] = useState(current ?? "");
@@ -28,7 +29,7 @@ function AliasEditor({ current, onClose }: { current: string | null; onClose: ()
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="alias-pop" onClick={(event) => event.stopPropagation()}>
+    <div className="account-edit-form">
       <span className="surface-kicker">Tu alias</span>
       <input
         value={value}
@@ -37,7 +38,7 @@ function AliasEditor({ current, onClose }: { current: string | null; onClose: ()
         maxLength={40}
       />
       {error ? <p className="danger" style={{ margin: 0, fontSize: "12px" }}>{error}</p> : null}
-      <div className="alias-pop-actions">
+      <div className="account-edit-actions">
         <button
           type="button"
           disabled={saving}
@@ -62,10 +63,80 @@ function AliasEditor({ current, onClose }: { current: string | null; onClose: ()
   );
 }
 
-export function RoleLinks() {
-  const pathname = usePathname();
-  const [session, setSession] = useState<{ role: string; address: string; alias: string | null } | null>(null);
+function AccountMenu({
+  session,
+  address,
+  onDisconnect,
+}: {
+  session: SessionInfo | null;
+  address: string;
+  onDisconnect: () => void;
+}) {
   const [editing, setEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const alias = session?.alias?.trim();
+  const roleLabel = session ? ROLE_LABELS[session.role] ?? session.role : null;
+
+  return (
+    <div className="account-menu" onClick={(event) => event.stopPropagation()}>
+      <div className="account-menu-head">
+        <span className="account-avatar">{initialsFor(session?.alias ?? null, address)}</span>
+        <div>
+          <div className="account-menu-name">{alias || shortHash(address)}</div>
+          <div className="account-menu-net"><span className="account-dot" />{roleLabel ? `${roleLabel} · Sepolia` : "Sepolia"}</div>
+        </div>
+      </div>
+
+      {editing ? (
+        <AliasEditor current={session?.alias ?? null} onClose={() => setEditing(false)} />
+      ) : (
+        <>
+          <div className="account-addr">
+            <span className="mono">{shortHash(address)}</span>
+            <button
+              type="button"
+              className="account-icon-btn"
+              title="Copiar dirección"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(address);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1400);
+                } catch {
+                  /* clipboard no disponible */
+                }
+              }}
+            >
+              {copied ? "Copiado" : "Copiar"}
+            </button>
+            <a
+              className="account-icon-btn"
+              href={explorerAddressUrl(address)}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Ver en explorer"
+            >
+              Explorer ↗
+            </a>
+          </div>
+
+          <button type="button" className="account-menu-item" onClick={() => setEditing(true)}>
+            Editar alias
+          </button>
+          <button type="button" className="account-menu-item account-menu-danger" onClick={onDisconnect}>
+            Desconectar
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function RoleLinks() {
+  const [session, setSession] = useState<SessionInfo | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { disconnect } = useDisconnect();
+  const router = useRouter();
 
   useEffect(() => {
     const update = () => {
@@ -81,6 +152,15 @@ export function RoleLinks() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    const close = () => setMenuOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [menuOpen]);
+
   return (
     <header className="topbar">
       <Link className="brand" href="/">
@@ -88,20 +168,9 @@ export function RoleLinks() {
         <span>BugBounty <span style={{ color: "var(--accent)" }}>Grid</span></span>
       </Link>
 
-      <nav className="nav" aria-label="Navegación principal">
-        {NAV.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          return (
-            <Link key={item.href} className={`nav-link${active ? " nav-link-active" : ""}`} href={item.href}>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-
       <div className="topbar-right">
         <ConnectButton.Custom>
-          {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+          {({ account, chain, openChainModal, openConnectModal, mounted }) => {
             const connected = mounted && account && chain;
             if (!connected) {
               return (
@@ -119,29 +188,33 @@ export function RoleLinks() {
             }
             const alias = session?.alias?.trim();
             return (
-              <div className="account-cluster">
-                <div className="account-pill" style={{ position: "relative" }}>
-                  <button type="button" className="account-main" onClick={openAccountModal}>
-                    <span className="account-dot" />
-                    <span className="account-text">
-                      <span className="account-name">{alias || shortHash(account.address)}</span>
-                      <span className="account-meta">
-                        {session ? ROLE_LABELS[session.role] ?? session.role : "—"} · {account.displayBalance ?? shortHash(account.address)}
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="account-edit"
-                    title="Editar alias"
-                    onClick={() => setEditing((value) => !value)}
-                  >
-                    ✎
-                  </button>
-                  {editing ? (
-                    <AliasEditor current={session?.alias ?? null} onClose={() => setEditing(false)} />
-                  ) : null}
-                </div>
+              <div className="account-pill" style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  className="account-main"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen((value) => !value);
+                  }}
+                >
+                  <span className="account-avatar">{initialsFor(session?.alias ?? null, account.address)}</span>
+                  <span className="account-text">
+                    <span className="account-name">{alias || shortHash(account.address)}</span>
+                    <span className="account-meta">{shortHash(account.address)}</span>
+                  </span>
+                  <span className={`account-chevron${menuOpen ? " account-chevron-open" : ""}`} aria-hidden>▾</span>
+                </button>
+                {menuOpen ? (
+                  <AccountMenu
+                    session={session}
+                    address={account.address}
+                    onDisconnect={() => {
+                      setMenuOpen(false);
+                      disconnect();
+                      router.push("/");
+                    }}
+                  />
+                ) : null}
               </div>
             );
           }}
