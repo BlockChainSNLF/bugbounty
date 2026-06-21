@@ -15,7 +15,7 @@ export class BountiesController {
   @Post()
   async create(
     @Headers("authorization") authorization: string | undefined,
-    @Body() body: { address: string; title: string; description: string; rewardWei: string; chainId: number },
+    @Body() body: { address: string; title: string; description: string; outOfScope: string; rewardWei: string; chainId: number },
   ) {
     const session = await this.authService.requireRole(authorization, ["company", "admin"]);
     return this.bountiesService.create({ ...body, actorAddress: session.address });

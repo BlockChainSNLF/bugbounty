@@ -1,4 +1,4 @@
-import { createPublicClient, custom, encodeFunctionData, type Abi } from "viem";
+import { encodeFunctionData, type Abi } from "viem";
 
 declare global {
   interface Window {
@@ -162,14 +162,33 @@ export async function writeContractAction(parameters: {
   return hash as `0x${string}`;
 }
 
-export async function waitForTransactionReceipt(hash: `0x${string}`) {
+export async function waitForTransactionReceipt(
+  hash: `0x${string}`,
+  { timeoutMs = 180_000, intervalMs = 2_000 } = {},
+) {
   if (!window.ethereum) {
     throw new Error("No wallet provider found");
   }
 
-  const publicClient = createPublicClient({
-    transport: custom(window.ethereum),
-  });
+  // Polleamos el receipt directamente contra MetaMask. El block-watcher de viem
+  // sobre el provider inyectado se quedaba colgado esperando confirmación, lo que
+  // dejaba el refresco de la UI sin ejecutarse (cambio "fantasma" hasta recargar).
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const receipt = (await window.ethereum.request({
+      method: "eth_getTransactionReceipt",
+      params: [hash],
+    })) as { blockNumber?: string | null; status?: string } | null;
 
-  return publicClient.waitForTransactionReceipt({ hash });
+    if (receipt && receipt.blockNumber) {
+      if (receipt.status && BigInt(receipt.status) === 0n) {
+        throw new Error("La transacción fue revertida on-chain.");
+      }
+      return receipt;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error("La transacción no se confirmó a tiempo. Si MetaMask la confirmó, recargá la página.");
 }

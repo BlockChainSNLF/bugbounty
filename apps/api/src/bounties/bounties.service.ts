@@ -26,6 +26,7 @@ export class BountiesService {
     address: string;
     title: string;
     description: string;
+    outOfScope: string;
     rewardWei: string;
     chainId: number;
     actorAddress: string;
@@ -74,17 +75,19 @@ export class BountiesService {
     }
 
     await this.db.query(
-      `insert into bounties (address, title, description, reward_wei, chain_id, company_address, created_by)
-       values ($1, $2, $3, $4, $5, $6, $6)
+      `insert into bounties (address, title, description, out_of_scope, reward_wei, chain_id, company_address, created_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $7)
        on conflict (address) do update
        set title = excluded.title,
            description = excluded.description,
+           out_of_scope = excluded.out_of_scope,
            reward_wei = excluded.reward_wei,
            chain_id = excluded.chain_id`,
       [
         payload.address.toLowerCase(),
         payload.title,
         payload.description,
+        payload.outOfScope ?? "",
         payload.rewardWei,
         payload.chainId,
         payload.actorAddress,

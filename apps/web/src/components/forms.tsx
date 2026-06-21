@@ -35,7 +35,7 @@ type BountyOption = {
 };
 
 export function RegisterBountyForm({ onCreated }: { onCreated(): Promise<unknown> }) {
-  const [payload, setPayload] = useState({ title: "", description: "", rewardEth: "0.1" });
+  const [payload, setPayload] = useState({ title: "", description: "", outOfScope: "", rewardEth: "1.0" });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
@@ -70,12 +70,13 @@ export function RegisterBountyForm({ onCreated }: { onCreated(): Promise<unknown
             address: receipt.contractAddress,
             title: payload.title,
             description: payload.description,
+            outOfScope: payload.outOfScope,
             rewardWei: rewardWei.toString(),
             chainId: deploySpec.chainId,
           }),
         });
         toast.showSuccess("Programa creado y recompensa bloqueada en escrow.");
-        setPayload({ title: "", description: "", rewardEth: "0.1" });
+        setPayload({ title: "", description: "", outOfScope: "", rewardEth: "1.0" });
         await onCreated();
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "No pudimos crear el programa");
@@ -83,24 +84,24 @@ export function RegisterBountyForm({ onCreated }: { onCreated(): Promise<unknown
         setSubmitting(false);
       }
     }}>
-      <div className="form-header">
-        <span className="surface-kicker">Bounty deploy</span>
-        <h3>Crear programa</h3>
-      </div>
+      <p className="eyebrow" style={{ margin: "0 0 18px" }}>Nuevo programa de bounty</p>
       <label>
         <span>Nombre del programa</span>
         <input value={payload.title} onChange={(event) => setPayload({ ...payload, title: event.target.value })} placeholder="Portal de clientes" />
       </label>
       <label>
-        <span>Alcance</span>
-        <textarea value={payload.description} onChange={(event) => setPayload({ ...payload, description: event.target.value })} placeholder="Dominios, sistemas y condiciones del programa" />
+        <span>En alcance</span>
+        <textarea value={payload.description} onChange={(event) => setPayload({ ...payload, description: event.target.value })} placeholder="Dominios, contratos y sistemas que aceptás que se testeen" />
       </label>
       <label>
-        <span>Recompensa en ETH</span>
-        <input value={payload.rewardEth} onChange={(event) => setPayload({ ...payload, rewardEth: event.target.value })} placeholder="0.1" />
+        <span>Fuera de alcance <span className="muted" style={{ fontWeight: 400 }}>· qué no aceptás</span></span>
+        <textarea value={payload.outOfScope} onChange={(event) => setPayload({ ...payload, outOfScope: event.target.value })} placeholder="Phishing, DoS, hallazgos de scanners sin PoC, entornos de staging…" />
       </label>
-      <button disabled={submitting} type="submit">{submitting ? "Creando programa…" : "Bloquear escrow y crear programa"}</button>
-      <p className="muted" style={{ margin: 0, fontSize: 12 }}>La recompensa se bloquea en el contrato al desplegar. Vas a firmar el deploy con tu wallet.</p>
+      <label>
+        <span>Recompensa en ETH <span className="muted" style={{ fontWeight: 400 }}>(se bloquea en escrow)</span></span>
+        <input value={payload.rewardEth} onChange={(event) => setPayload({ ...payload, rewardEth: event.target.value })} placeholder="1.0" />
+      </label>
+      <button disabled={submitting} type="submit">{submitting ? "Desplegando…" : "Desplegar escrow y publicar"}</button>
       {error ? <p className="danger">{error}</p> : null}
     </form>
   );

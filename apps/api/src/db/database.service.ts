@@ -97,6 +97,7 @@ export class DatabaseService implements OnModuleInit {
       );
 
       alter table users add column if not exists alias text;
+      alter table bounties add column if not exists out_of_scope text not null default '';
     `);
   }
 

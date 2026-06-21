@@ -76,10 +76,20 @@ export function CompanyWorkspace() {
           <div className="panel">
             <RegisterBountyForm onCreated={async () => { setRefreshKey((current) => current + 1); setTab("programs"); }} />
           </div>
-          <div className="status-rail">
-            <div><span>Escrow</span><strong>Deploy con tu wallet</strong></div>
-            <div><span>Validación</span><strong>On-chain</strong></div>
-            <div><span>Disputas</span><strong>Arbitraje 3/3</strong></div>
+          <div className="panel" style={{ alignSelf: "start" }}>
+            <p className="eyebrow" style={{ margin: "0 0 18px" }}>Qué pasa al publicar</p>
+            <div style={{ display: "grid", gap: 16 }}>
+              {[
+                "Se despliega un contrato con la recompensa bloqueada.",
+                "Los hunters ven el programa y envían reportes.",
+                "Aceptás para pagar automáticamente o rechazás (puede ir a disputa).",
+              ].map((text, i) => (
+                <div key={i} style={{ display: "flex", gap: 14 }}>
+                  <span style={{ font: "700 13px var(--font-mono)", color: "var(--accent)", minWidth: 22, flexShrink: 0 }}>0{i + 1}</span>
+                  <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>{text}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}
