@@ -49,6 +49,7 @@ export class AuthService {
       token: randomBytes(24).toString("hex"),
       address: normalizedAddress,
       role,
+      isAdmin: this.isAdminWallet(normalizedAddress),
       companyApproved: await this.isCompanyApproved(normalizedAddress),
       alias: await this.getAlias(normalizedAddress),
     };
@@ -92,18 +93,19 @@ export class AuthService {
 
   async requireRole(authHeader: string | undefined, roles: Role[]) {
     const session = await this.requireSession(authHeader);
-    if (!roles.includes(session.role)) {
+    // El admin (ADMIN_WALLET) es superusuario: pasa cualquier gate de rol.
+    if (!session.isAdmin && !roles.includes(session.role)) {
       throw new ForbiddenException("Insufficient role");
     }
     return session;
   }
 
-  private async resolveRole(address: string): Promise<Role> {
+  private isAdminWallet(address: string) {
     const adminWallet = process.env.ADMIN_WALLET?.toLowerCase();
-    if (adminWallet && adminWallet === address) {
-      return "admin";
-    }
+    return Boolean(adminWallet) && adminWallet === address.toLowerCase();
+  }
 
+  private async resolveRole(address: string): Promise<Role> {
     const existing = await this.db.query<{ role: Role }>(
       "select role from users where address = $1",
       [address],

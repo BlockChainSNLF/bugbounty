@@ -62,11 +62,11 @@ function AdminLogin({ onSession }: { onSession(session: Session): void }) {
         body: JSON.stringify({ address }),
       });
       const signature = await signMessage(address, nonce.message);
-      const verified = await api<{ token: string; address: string; role: string }>("/auth/wallet/verify", {
+      const verified = await api<{ token: string; address: string; role: string; isAdmin: boolean }>("/auth/wallet/verify", {
         method: "POST",
         body: JSON.stringify({ address, signature }),
       });
-      if (verified.role !== "admin") {
+      if (!verified.isAdmin) {
         throw new Error("Esta cuenta no tiene permisos de administrador.");
       }
       window.localStorage.setItem("bugbounty.admin.token", verified.token);
