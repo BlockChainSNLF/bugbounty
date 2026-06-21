@@ -5,6 +5,7 @@ export type WalletSession = {
   address: string;
   role: Role;
   companyApproved: boolean;
+  alias: string | null;
 };
 
 export type BountyRecord = {

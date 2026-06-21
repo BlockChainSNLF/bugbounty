@@ -1,133 +1,27 @@
-import { createPublicClient, createWalletClient, custom, defineChain, encodeFunctionData, type Abi } from "viem";
+import {
+  deployContract,
+  getAccount,
+  signMessage as wagmiSignMessage,
+  waitForTransactionReceipt as wagmiWaitForTransactionReceipt,
+  writeContract,
+} from "@wagmi/core";
+import type { Abi } from "viem";
+import { sepolia } from "wagmi/chains";
 
-declare global {
-  interface Window {
-    ethereum?: {
-      selectedAddress?: string | null;
-      on?(event: string, listener: (...args: unknown[]) => void): void;
-      removeListener?(event: string, listener: (...args: unknown[]) => void): void;
-      request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
-    };
-  }
+import { wagmiConfig } from "./wagmi";
+
+export function getActiveWalletAccount() {
+  return getAccount(wagmiConfig).address?.toLowerCase() ?? null;
 }
 
-function normalizeAccounts(accounts: unknown) {
-  return (accounts as string[]).map((entry) => entry.toLowerCase());
-}
-
-function getErrorMessage(caught: unknown) {
-  return caught instanceof Error ? caught.message : String(caught);
-}
-
-function normalizeHexQuantity(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-  if (!value.startsWith("0x")) {
-    return null;
-  }
-  return BigInt(value);
-}
-
-export async function connectWallet() {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-  return connectPreferredWallet();
-}
-
-export async function getWalletAccounts() {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-  const accounts = await window.ethereum.request({ method: "eth_accounts" });
-  return normalizeAccounts(accounts);
-}
-
-export async function requestWalletAccounts() {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-  const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-  return normalizeAccounts(accounts);
-}
-
-export async function getActiveWalletAccount() {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-
-  const selectedAddress = window.ethereum.selectedAddress?.toLowerCase();
-  if (selectedAddress) {
-    return selectedAddress;
-  }
-
-  const accounts = await getWalletAccounts();
-  return accounts[0] ?? null;
-}
-
-export async function connectPreferredWallet(preferredAddress?: string) {
-  await requestWalletAccounts();
-  const activeAddress = await getActiveWalletAccount();
-  if (!activeAddress) {
-    throw new Error("Wallet did not return an account");
-  }
-
-  if (preferredAddress) {
-    const normalizedPreferred = preferredAddress.toLowerCase();
-    if (activeAddress !== normalizedPreferred) {
-      throw new Error(`MetaMask sigue activa en ${activeAddress}. Cambiá la cuenta activa en MetaMask y volvé a intentar.`);
-    }
-    return normalizedPreferred;
-  }
-
-  return activeAddress;
+export function isWalletConnected() {
+  return getAccount(wagmiConfig).isConnected;
 }
 
 export async function signMessage(address: string, message: string) {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-  const signature = await window.ethereum.request({
-    method: "personal_sign",
-    params: [message, address],
-  });
-  return signature as `0x${string}`;
-}
-
-export async function getConnectedChainId() {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-  const chainId = await window.ethereum.request({ method: "eth_chainId" });
-  return Number(chainId);
-}
-
-export async function switchToChain(chainId: number) {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-  await window.ethereum.request({
-    method: "wallet_switchEthereumChain",
-    params: [{ chainId: `0x${chainId.toString(16)}` }],
-  });
-}
-
-async function getConnectedChain() {
-  const chainId = await getConnectedChainId();
-  return defineChain({
-    id: chainId,
-    name: `Connected chain ${chainId}`,
-    nativeCurrency: {
-      name: "Ether",
-      symbol: "ETH",
-      decimals: 18,
-    },
-    rpcUrls: {
-      default: {
-        http: [],
-      },
-    },
+  return wagmiSignMessage(wagmiConfig, {
+    account: address as `0x${string}`,
+    message,
   });
 }
 
@@ -137,69 +31,15 @@ export async function writeContractAction(parameters: {
   functionName: string;
   args: readonly unknown[];
   account: `0x${string}`;
-  gas?: bigint;
 }) {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-
-  const data = encodeFunctionData({
+  return writeContract(wagmiConfig, {
+    address: parameters.address,
     abi: parameters.abi,
     functionName: parameters.functionName,
     args: parameters.args,
+    account: parameters.account,
+    chainId: sepolia.id,
   });
-
-  const baseTransaction = {
-    from: parameters.account,
-    to: parameters.address,
-    data,
-  };
-
-  let estimatedGas: bigint | null = null;
-  try {
-    estimatedGas = normalizeHexQuantity(await window.ethereum.request({
-      method: "eth_estimateGas",
-      params: [baseTransaction],
-    }));
-  } catch {
-    estimatedGas = null;
-  }
-
-  const bufferedEstimatedGas = estimatedGas ? (estimatedGas * 12n) / 10n : null;
-  const requestedGas = parameters.gas ?? null;
-  const gas = requestedGas && bufferedEstimatedGas
-    ? requestedGas > bufferedEstimatedGas ? requestedGas : bufferedEstimatedGas
-    : requestedGas ?? bufferedEstimatedGas;
-
-  const buildTransaction = (includeGas: boolean) => ({
-    ...baseTransaction,
-    ...(includeGas && gas ? { gas: `0x${gas.toString(16)}` } : {}),
-  });
-
-  let hash: unknown;
-  try {
-    hash = await window.ethereum.request({
-      method: "eth_sendTransaction",
-      params: [buildTransaction(Boolean(gas))],
-    });
-  } catch (caught) {
-    const message = getErrorMessage(caught).toLowerCase();
-    if (
-      !gas ||
-      (!message.includes("gas limit too high") &&
-        !message.includes("intrinsic gas too low") &&
-        !message.includes("out of gas"))
-    ) {
-      throw caught;
-    }
-
-    hash = await window.ethereum.request({
-      method: "eth_sendTransaction",
-      params: [buildTransaction(false)],
-    });
-  }
-
-  return hash as `0x${string}`;
 }
 
 export async function deployContractAction(parameters: {
@@ -209,36 +49,16 @@ export async function deployContractAction(parameters: {
   account: `0x${string}`;
   value?: bigint;
 }) {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-
-  const chain = await getConnectedChain();
-
-  const walletClient = createWalletClient({
-    account: parameters.account,
-    chain,
-    transport: custom(window.ethereum),
-  });
-
-  return walletClient.deployContract({
+  return deployContract(wagmiConfig, {
     abi: parameters.abi,
     bytecode: parameters.bytecode,
     args: parameters.args,
     account: parameters.account,
     value: parameters.value,
-    chain,
+    chainId: sepolia.id,
   });
 }
 
 export async function waitForTransactionReceipt(hash: `0x${string}`) {
-  if (!window.ethereum) {
-    throw new Error("No wallet provider found");
-  }
-
-  const publicClient = createPublicClient({
-    transport: custom(window.ethereum),
-  });
-
-  return publicClient.waitForTransactionReceipt({ hash });
+  return wagmiWaitForTransactionReceipt(wagmiConfig, { hash, chainId: sepolia.id });
 }

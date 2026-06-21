@@ -83,6 +83,16 @@ describe("DisputeContract", async function () {
     assert.equal(hunterBalanceAfter - hunterBalanceBefore, REWARD);
   });
 
+  it("rejects openDispute from a caller that is not a registered bounty", async function () {
+    const { hunter1, disputeContract } = await deploySystem();
+
+    await assert.rejects(
+      disputeContract.write.openDispute([0n, REPORT_HASH, hunter1.account.address], {
+        account: hunter1.account,
+      }),
+    );
+  });
+
   it("keeps FIFO frozen until a dismissed dispute is finalized", async function () {
     const { hunter1, hunter2, arb1, arb2, arb3, arb4, disputeContract, bounty } = await deploySystem();
 

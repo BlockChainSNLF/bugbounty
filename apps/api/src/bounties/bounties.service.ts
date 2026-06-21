@@ -113,11 +113,14 @@ export class BountiesService {
       reward_wei: string;
       chain_id: number;
       company_address: string;
+      company_alias: string | null;
       created_at: string;
     }>(
-      `select address, title, description, reward_wei, chain_id, company_address, created_at
-       from bounties
-       order by created_at desc`,
+      `select b.address, b.title, b.description, b.reward_wei, b.chain_id, b.company_address,
+              cu.alias as company_alias, b.created_at
+       from bounties b
+       left join users cu on cu.address = b.company_address
+       order by b.created_at desc`,
     );
 
     if (!result.rows.length) {
@@ -161,12 +164,15 @@ export class BountiesService {
       reward_wei: string;
       chain_id: number;
       company_address: string;
+      company_alias: string | null;
       created_at: string;
     }>(
-      `select address, title, description, reward_wei, chain_id, company_address, created_at
-       from bounties
-       where company_address = $1
-       order by created_at desc`,
+      `select b.address, b.title, b.description, b.reward_wei, b.chain_id, b.company_address,
+              cu.alias as company_alias, b.created_at
+       from bounties b
+       left join users cu on cu.address = b.company_address
+       where b.company_address = $1
+       order by b.created_at desc`,
       [actorAddress.toLowerCase()],
     );
 
@@ -174,9 +180,11 @@ export class BountiesService {
       id: string;
       bounty_address: string;
       author_address: string;
+      author_alias: string | null;
       title: string;
       status: string;
       report_hash: string;
+      tx_hash: string | null;
       created_at: string;
       dispute_id: string | null;
       dispute_status: string | null;
@@ -187,9 +195,11 @@ export class BountiesService {
          r.id,
          r.bounty_address,
          r.author_address,
+         au.alias as author_alias,
          r.title,
          r.status,
          r.report_hash,
+         r.tx_hash,
          r.created_at,
          d.id as dispute_id,
          d.status as dispute_status,
@@ -197,6 +207,7 @@ export class BountiesService {
          d.votes_cast
        from reports r
        join bounties b on b.address = r.bounty_address
+       left join users au on au.address = r.author_address
        left join disputes d
          on d.bounty_address = r.bounty_address
         and d.report_id_on_chain = r.report_id_on_chain

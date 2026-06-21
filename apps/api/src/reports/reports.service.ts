@@ -104,14 +104,18 @@ export class ReportsService {
          r.title,
          r.status,
          r.report_hash,
+         r.tx_hash,
          r.created_at,
          r.report_id_on_chain,
          b.title as bounty_title,
+         b.company_address,
+         cu.alias as company_alias,
          d.id as dispute_id,
          d.status as dispute_status,
          d.result as dispute_result
        from reports r
        join bounties b on b.address = r.bounty_address
+       left join users cu on cu.address = b.company_address
        left join disputes d
          on d.bounty_address = r.bounty_address
         and d.report_id_on_chain = r.report_id_on_chain

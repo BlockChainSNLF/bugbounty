@@ -6,12 +6,16 @@
     "packages/*"
   ],
   "scripts": {
+    "install:all": "npm install && npm --prefix Contracts install",
     "build:shared": "npm --workspace @bugbounty/shared run build",
-    "dev:api": "npm --workspace @bugbounty/api run dev",
-    "dev:admin": "npm --workspace @bugbounty/admin run dev",
-    "dev:web": "npm --workspace @bugbounty/web run dev",
+    "dev:api": "dotenv -e .env -- npm --workspace @bugbounty/api run dev",
+    "dev:admin": "dotenv -e .env -- npm --workspace @bugbounty/admin run dev",
+    "dev:web": "dotenv -e .env -- npm --workspace @bugbounty/web run dev",
     "build": "npm run build:shared && npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^7.4.4"
   }
 }

@@ -20,6 +20,8 @@ contract MockDisputeContract is IDisputeContract {
         _result = result;
     }
 
+    function registerBounty() external {}
+
     function openDispute(uint256 reportId, bytes32, address) external returns (uint256 disputeId) {
         disputeId = disputeCount++;
         disputes[disputeId] = PendingDispute({

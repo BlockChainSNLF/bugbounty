@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
 import "./interfaces/IBountyResolution.sol";
 import "./interfaces/IDisputeContract.sol";
 
-contract DisputeContract is IDisputeContract {
+contract DisputeContract is IDisputeContract, Ownable, ReentrancyGuard {
     uint256 public constant JURY_SIZE = 3;
 
     struct Dispute {
@@ -16,13 +19,13 @@ contract DisputeContract is IDisputeContract {
         uint64 deadline;
         uint8 upheldVotes;
         uint8 dismissedVotes;
-        uint8 votesCast;
         bool resolved;
         DisputeResult result;
     }
 
     event ArbitratorRegistered(address indexed arbitrator);
     event ArbitratorRemoved(address indexed arbitrator);
+    event BountyRegistered(address indexed bounty);
     event PoolFunded(address indexed sender, uint256 amount);
     event PoolWithdrawn(address indexed owner, uint256 amount);
     event DisputeOpened(uint256 indexed disputeId, address indexed bounty, uint256 indexed reportId, address hunter);
@@ -30,7 +33,6 @@ contract DisputeContract is IDisputeContract {
     event VoteCast(uint256 indexed disputeId, address indexed arbitrator, DisputeResult vote);
     event DisputeFinalized(uint256 indexed disputeId, DisputeResult result, uint8 votesCast);
 
-    address public owner;
     uint64 public immutable voteDuration;
     uint256 public immutable arbitratorFee;
     uint256 public reservedFees;
@@ -38,30 +40,37 @@ contract DisputeContract is IDisputeContract {
 
     address[] private arbitrators;
     mapping(address => bool) public isArbitrator;
+    mapping(address => bool) public isBounty;
     mapping(uint256 => Dispute) public disputes;
     mapping(uint256 => address[3]) private disputeArbitrators;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
-    mapping(uint256 => mapping(address => bool)) public isAssignedArbitrator;
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner");
+    modifier onlyBounty() {
+        require(isBounty[msg.sender], "Only registered bounty");
         _;
     }
 
     modifier onlyAssigned(uint256 disputeId) {
-        require(isAssignedArbitrator[disputeId][msg.sender], "Arbitrator not assigned");
+        require(_isAssigned(disputeId, msg.sender), "Arbitrator not assigned");
         _;
     }
 
-    constructor(uint64 _voteDuration, uint256 _arbitratorFee) {
+    constructor(uint64 _voteDuration, uint256 _arbitratorFee) Ownable(msg.sender) {
         require(_voteDuration > 0, "Invalid vote duration");
-        owner = msg.sender;
         voteDuration = _voteDuration;
         arbitratorFee = _arbitratorFee;
     }
 
     receive() external payable {
         emit PoolFunded(msg.sender, msg.value);
+    }
+
+    /// @notice Bounties self-register on deployment so only they can open disputes.
+    function registerBounty() external {
+        if (!isBounty[msg.sender]) {
+            isBounty[msg.sender] = true;
+            emit BountyRegistered(msg.sender);
+        }
     }
 
     function registerArbitrator(address arbitrator) external onlyOwner {
@@ -91,11 +100,11 @@ contract DisputeContract is IDisputeContract {
         revert("Arbitrator not found");
     }
 
-    function withdrawExcess(uint256 amount) external onlyOwner {
+    function withdrawExcess(uint256 amount) external onlyOwner nonReentrant {
         require(amount <= getAvailablePool(), "Insufficient available pool");
-        (bool success, ) = payable(owner).call{value: amount}("");
+        (bool success, ) = payable(owner()).call{value: amount}("");
         require(success, "Withdraw failed");
-        emit PoolWithdrawn(owner, amount);
+        emit PoolWithdrawn(owner(), amount);
     }
 
     function getArbitrators() external view returns (address[] memory) {
@@ -106,6 +115,10 @@ contract DisputeContract is IDisputeContract {
         return disputeArbitrators[disputeId];
     }
 
+    function isAssignedArbitrator(uint256 disputeId, address account) external view returns (bool) {
+        return _isAssigned(disputeId, account);
+    }
+
     function getAvailablePool() public view returns (uint256) {
         return address(this).balance - reservedFees;
     }
@@ -114,7 +127,7 @@ contract DisputeContract is IDisputeContract {
         uint256 reportId,
         bytes32 reportHash,
         address hunter
-    ) external returns (uint256 disputeId) {
+    ) external onlyBounty returns (uint256 disputeId) {
         require(arbitrators.length >= JURY_SIZE, "Not enough arbitrators");
         uint256 requiredReserve = arbitratorFee * JURY_SIZE;
         require(getAvailablePool() >= requiredReserve, "Insufficient arbitration pool");
@@ -132,9 +145,6 @@ contract DisputeContract is IDisputeContract {
 
         address[3] memory selected = _selectArbitrators(reportId, disputeId);
         disputeArbitrators[disputeId] = selected;
-        for (uint256 i = 0; i < JURY_SIZE; i++) {
-            isAssignedArbitrator[disputeId][selected[i]] = true;
-        }
 
         emit DisputeOpened(disputeId, msg.sender, reportId, hunter);
         emit ArbitratorsAssigned(disputeId, selected);
@@ -147,7 +157,6 @@ contract DisputeContract is IDisputeContract {
         require(!hasVoted[disputeId][msg.sender], "Vote already cast");
 
         hasVoted[disputeId][msg.sender] = true;
-        dispute.votesCast++;
         if (voteResult == DisputeResult.UPHELD) {
             dispute.upheldVotes++;
         } else {
@@ -157,11 +166,13 @@ contract DisputeContract is IDisputeContract {
         emit VoteCast(disputeId, msg.sender, voteResult);
     }
 
-    function finalizeDispute(uint256 disputeId) external {
+    function finalizeDispute(uint256 disputeId) external nonReentrant {
         Dispute storage dispute = disputes[disputeId];
         require(dispute.bounty != address(0), "Dispute does not exist");
         require(!dispute.resolved, "Dispute already resolved");
-        require(_hasDecisiveMajority(dispute) || block.timestamp > dispute.deadline, "Dispute still active");
+
+        bool decisive = _hasDecisiveMajority(dispute);
+        require(decisive || block.timestamp > dispute.deadline, "Dispute still active");
 
         DisputeResult result = _computeResult(dispute);
         dispute.resolved = true;
@@ -171,24 +182,23 @@ contract DisputeContract is IDisputeContract {
         IBountyResolution(dispute.bounty).resolveDispute(dispute.reportId, result);
         _payParticipatingArbitrators(disputeId);
 
-        emit DisputeFinalized(disputeId, result, dispute.votesCast);
+        emit DisputeFinalized(disputeId, result, dispute.upheldVotes + dispute.dismissedVotes);
+    }
+
+    function _hasDecisiveMajority(Dispute storage dispute) private view returns (bool) {
+        return dispute.upheldVotes >= 2 || dispute.dismissedVotes >= 2;
     }
 
     function _computeResult(Dispute storage dispute) private view returns (DisputeResult) {
-        if (dispute.upheldVotes >= 2) {
-            return DisputeResult.UPHELD;
-        }
-        if (dispute.dismissedVotes >= 2) {
-            return DisputeResult.DISMISSED;
-        }
-        if (block.timestamp > dispute.deadline && dispute.upheldVotes > dispute.dismissedVotes) {
+        if (dispute.upheldVotes > dispute.dismissedVotes) {
             return DisputeResult.UPHELD;
         }
         return DisputeResult.DISMISSED;
     }
 
-    function _hasDecisiveMajority(Dispute storage dispute) private view returns (bool) {
-        return dispute.upheldVotes >= 2 || dispute.dismissedVotes >= 2;
+    function _isAssigned(uint256 disputeId, address account) private view returns (bool) {
+        address[3] memory selected = disputeArbitrators[disputeId];
+        return account == selected[0] || account == selected[1] || account == selected[2];
     }
 
     function _payParticipatingArbitrators(uint256 disputeId) private {

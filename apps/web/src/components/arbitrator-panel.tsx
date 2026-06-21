@@ -6,6 +6,8 @@ import { disputeResultLabels, disputeAbi } from "@bugbounty/shared/contracts";
 
 import { api } from "../lib/api";
 import { waitForTransactionReceipt, writeContractAction } from "../lib/wallet";
+import { AddressDisplay } from "./address-display";
+import { useToast } from "./toast";
 
 type Session = {
   address: string;
@@ -14,6 +16,7 @@ type Session = {
 
 type Vote = {
   arbitrator_address: string;
+  arbitrator_alias: string | null;
   vote_result: string;
   created_at: string;
 };
@@ -36,8 +39,8 @@ export function ArbitratorPanel() {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [pendingVoteId, setPendingVoteId] = useState<string | null>(null);
+  const toast = useToast();
 
   async function loadDisputes() {
     const allDisputes = await api<Dispute[]>("/disputes");
@@ -91,7 +94,6 @@ export function ArbitratorPanel() {
     try {
       setPendingVoteId(dispute.id);
       setError(null);
-      setNotice(null);
 
       const intent = await api<{
         nextAction: {
@@ -111,6 +113,7 @@ export function ArbitratorPanel() {
         args: intent.nextAction.args,
         account: session.address as `0x${string}`,
       });
+      toast.showTx("Registrando voto…", hash);
       await waitForTransactionReceipt(hash);
 
       if (dispute.bounty_address) {
@@ -142,6 +145,7 @@ export function ArbitratorPanel() {
           args: finalizeIntent.nextAction.args,
           account: session.address as `0x${string}`,
         });
+        toast.showTx("Cerrando disputa…", finalizeHash);
         await waitForTransactionReceipt(finalizeHash);
         if (updatedDispute.bounty_address) {
           try {
@@ -151,11 +155,11 @@ export function ArbitratorPanel() {
           }
         }
         await loadDisputes();
-        setNotice(`Voto y cierre enviados correctamente. Referencia: ${finalizeHash}`);
+        toast.showSuccess("Voto registrado y disputa cerrada por mayoría.");
         return;
       }
 
-      setNotice(`Voto enviado correctamente. Referencia: ${hash}`);
+      toast.showSuccess("Voto registrado.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "No pudimos registrar tu voto");
     } finally {
@@ -189,21 +193,21 @@ export function ArbitratorPanel() {
   return (
     <section className="grid">
       <div className="panel">
-        <h2>Panel del árbitro</h2>
-        <p className="muted">Revisá los casos asignados y emití tu decisión desde esta pantalla.</p>
-        <div className="badge">
-          <span>Cuenta activa</span>
-          <span className="mono">{session.address}</span>
+        <div className="stack-row">
+          <div>
+            <h3>Panel del árbitro</h3>
+            <p className="muted" style={{ margin: "6px 0 0" }}>Revisá los casos asignados y emití tu decisión desde esta pantalla.</p>
+          </div>
+          <div className="badge"><span>Cuenta</span><AddressDisplay address={session.address} link={false} /></div>
         </div>
       </div>
 
-      {notice ? <div className="panel"><p>{notice}</p></div> : null}
       {error ? <div className="panel"><p className="danger">{error}</p></div> : null}
 
       {assignedDisputes.length === 0 ? (
-        <div className="panel">
+        <div className="empty">
           <h3>Sin disputas asignadas</h3>
-          <p className="muted">Cuando se te asigne un caso, va a aparecer acá con su evidencia resumida y las opciones para votar.</p>
+          <p>Cuando se te asigne un caso, va a aparecer acá con su evidencia y las opciones para votar.</p>
         </div>
       ) : (
         assignedDisputes.map((dispute) => (
@@ -240,9 +244,9 @@ export function ArbitratorPanel() {
               <strong>Votos registrados</strong>
               {dispute.votes && dispute.votes.length > 0 ? (
                 dispute.votes.map((vote) => (
-                  <div className="badge" key={`${dispute.id}-${vote.arbitrator_address}`}>
-                    <span className="mono">{vote.arbitrator_address}</span>
-                    <span>{vote.vote_result}</span>
+                  <div className="list-row" key={`${dispute.id}-${vote.arbitrator_address}`}>
+                    <AddressDisplay address={vote.arbitrator_address} alias={vote.arbitrator_alias} link={false} />
+                    <span className={`pill ${vote.vote_result === "UPHELD" ? "pill-success" : "pill-warn"}`}>{vote.vote_result}</span>
                   </div>
                 ))
               ) : (

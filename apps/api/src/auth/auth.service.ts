@@ -39,19 +39,20 @@ export class AuthService {
 
     this.nonces.delete(normalizedAddress);
     const role = await this.resolveRole(normalizedAddress);
-    const session: WalletSession = {
-      token: randomBytes(24).toString("hex"),
-      address: normalizedAddress,
-      role,
-      companyApproved: await this.isCompanyApproved(normalizedAddress),
-    };
-    this.sessions.set(session.token, session);
     await this.db.query(
       `insert into users (address, role)
        values ($1, $2)
        on conflict (address) do nothing`,
       [normalizedAddress, role],
     );
+    const session: WalletSession = {
+      token: randomBytes(24).toString("hex"),
+      address: normalizedAddress,
+      role,
+      companyApproved: await this.isCompanyApproved(normalizedAddress),
+      alias: await this.getAlias(normalizedAddress),
+    };
+    this.sessions.set(session.token, session);
 
     return session;
   }
@@ -63,6 +64,30 @@ export class AuthService {
       throw new UnauthorizedException("Invalid session");
     }
     return session;
+  }
+
+  /** Returns the session with the alias refreshed from the database. */
+  async me(authHeader?: string) {
+    const session = await this.requireSession(authHeader);
+    const alias = await this.getAlias(session.address);
+    session.alias = alias;
+    return { ...session, alias };
+  }
+
+  async updateProfile(authHeader: string | undefined, alias: string | null) {
+    const session = await this.requireSession(authHeader);
+    const normalizedAlias = alias?.trim() ? alias.trim() : null;
+    await this.db.query("update users set alias = $2 where address = $1", [session.address, normalizedAlias]);
+    session.alias = normalizedAlias;
+    return { ...session, alias: normalizedAlias };
+  }
+
+  private async getAlias(address: string) {
+    const result = await this.db.query<{ alias: string | null }>(
+      "select alias from users where address = $1",
+      [address],
+    );
+    return result.rows[0]?.alias ?? null;
   }
 
   async requireRole(authHeader: string | undefined, roles: Role[]) {

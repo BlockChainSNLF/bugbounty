@@ -95,6 +95,8 @@ export class DatabaseService implements OnModuleInit {
         contract_address text primary key,
         last_block bigint not null default 0
       );
+
+      alter table users add column if not exists alias text;
     `);
   }
 

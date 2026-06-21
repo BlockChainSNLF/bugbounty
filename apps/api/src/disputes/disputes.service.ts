@@ -21,6 +21,7 @@ export class DisputesService {
          d.*,
          b.title as bounty_title,
          b.description as bounty_description,
+         hu.alias as hunter_alias,
          r.id as report_uuid,
          r.title as report_title,
          r.description as report_description,
@@ -28,6 +29,7 @@ export class DisputesService {
          r.status as report_status
        from disputes d
        left join bounties b on b.address = d.bounty_address
+       left join users hu on hu.address = d.hunter_address
        left join reports r
          on r.bounty_address = d.bounty_address
         and r.report_id_on_chain = d.report_id_on_chain
@@ -42,6 +44,7 @@ export class DisputesService {
          d.*,
          b.title as bounty_title,
          b.description as bounty_description,
+         hu.alias as hunter_alias,
          r.id as report_uuid,
          r.title as report_title,
          r.description as report_description,
@@ -49,6 +52,7 @@ export class DisputesService {
          r.status as report_status
        from disputes d
        left join bounties b on b.address = d.bounty_address
+       left join users hu on hu.address = d.hunter_address
        left join reports r
          on r.bounty_address = d.bounty_address
         and r.report_id_on_chain = d.report_id_on_chain
@@ -59,7 +63,7 @@ export class DisputesService {
       throw new NotFoundException("Dispute not found");
     }
     const votes = await this.db.query(
-      "select arbitrator_address, vote_result, created_at from arbitrator_votes where dispute_id = $1 order by created_at asc",
+      "select av.arbitrator_address, u.alias as arbitrator_alias, av.vote_result, av.created_at from arbitrator_votes av left join users u on u.address = av.arbitrator_address where av.dispute_id = $1 order by av.created_at asc",
       [id],
     );
     const enriched = await this.enrichDispute(dispute.rows[0]);
@@ -104,7 +108,7 @@ export class DisputesService {
 
   private async enrichDispute(dispute: DisputeDetails) {
     const votes = await this.db.query(
-      "select arbitrator_address, vote_result, created_at from arbitrator_votes where dispute_id = $1 order by created_at asc",
+      "select av.arbitrator_address, u.alias as arbitrator_alias, av.vote_result, av.created_at from arbitrator_votes av left join users u on u.address = av.arbitrator_address where av.dispute_id = $1 order by av.created_at asc",
       [dispute.id],
     );
     const assignedArbitrators = await this.getAssignedArbitrators(dispute.dispute_id_on_chain);

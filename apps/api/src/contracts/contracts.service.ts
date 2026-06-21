@@ -157,7 +157,7 @@ export class ContractsService implements OnModuleInit {
         ],
       );
 
-      await this.projectState(address, decoded.eventName, decoded.args as Record<string, unknown>);
+      await this.projectState(address, decoded.eventName, decoded.args as Record<string, unknown>, log.transactionHash);
     }
 
     await this.db.query(
@@ -175,7 +175,7 @@ export class ContractsService implements OnModuleInit {
     return message.includes("429") || message.includes("too many requests");
   }
 
-  private async projectState(address: string, eventName: string, args: Record<string, unknown>) {
+  private async projectState(address: string, eventName: string, args: Record<string, unknown>, txHash?: string) {
     switch (eventName) {
       case "ArbitratorRegistered":
         await this.db.query(
@@ -207,13 +207,15 @@ export class ContractsService implements OnModuleInit {
            )
            update reports
            set report_id_on_chain = $1,
-               status = $2
+               status = $2,
+               tx_hash = coalesce($5, tx_hash)
            where id in (select id from candidate)`,
           [
             Number(args.reportId),
             reportStatusLabels[0],
             address.toLowerCase(),
             String(args.hunter).toLowerCase(),
+            txHash ?? null,
           ],
         );
         break;

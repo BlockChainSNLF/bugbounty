@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Patch, Post } from "@nestjs/common";
 
 import { AuthService } from "./auth.service.js";
 
@@ -18,6 +18,14 @@ export class AuthController {
 
   @Get("me")
   async me(@Headers("authorization") authorization?: string) {
-    return this.authService.requireSession(authorization);
+    return this.authService.me(authorization);
+  }
+
+  @Patch("me")
+  async updateProfile(
+    @Body() body: { alias?: string | null },
+    @Headers("authorization") authorization?: string,
+  ) {
+    return this.authService.updateProfile(authorization, body.alias ?? null);
   }
 }

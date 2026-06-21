@@ -1,19 +1,27 @@
+import { getAccount } from "@wagmi/core";
+
 import { api } from "./api";
-import { connectPreferredWallet, signMessage } from "./wallet";
+import { signMessage } from "./wallet";
+import { CHAIN_ID, wagmiConfig } from "./wagmi";
 
 type Session = {
   token: string;
   address: string;
   role: string;
+  alias: string | null;
 };
 
 const SESSION_EVENT = "bugbounty:session-changed";
-const PREFERRED_WALLET_KEY = "bugbounty.preferred-wallet";
 
 function saveSession(session: Session) {
   window.localStorage.setItem("bugbounty.token", session.token);
   window.localStorage.setItem("bugbounty.role", session.role);
   window.localStorage.setItem("bugbounty.address", session.address);
+  if (session.alias) {
+    window.localStorage.setItem("bugbounty.alias", session.alias);
+  } else {
+    window.localStorage.removeItem("bugbounty.alias");
+  }
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
@@ -25,30 +33,17 @@ export function getStoredSession() {
   const token = window.localStorage.getItem("bugbounty.token");
   const role = window.localStorage.getItem("bugbounty.role");
   const address = window.localStorage.getItem("bugbounty.address");
+  const alias = window.localStorage.getItem("bugbounty.alias");
   if (!token || !role || !address) {
     return null;
   }
 
-  return { token, role, address };
+  return { token, role, address, alias };
 }
 
+/** The address currently connected through wagmi/RainbowKit, lowercased. */
 export function getPreferredWallet() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  return window.localStorage.getItem(PREFERRED_WALLET_KEY);
-}
-
-export function setPreferredWallet(address: string | null) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  if (!address) {
-    window.localStorage.removeItem(PREFERRED_WALLET_KEY);
-  } else {
-    window.localStorage.setItem(PREFERRED_WALLET_KEY, address.toLowerCase());
-  }
-  window.dispatchEvent(new Event(SESSION_EVENT));
+  return getAccount(wagmiConfig).address?.toLowerCase() ?? null;
 }
 
 export function clearStoredSession() {
@@ -56,25 +51,25 @@ export function clearStoredSession() {
     return;
   }
 
-  clearStoredAuthSession();
-  window.localStorage.removeItem(PREFERRED_WALLET_KEY);
-  window.dispatchEvent(new Event(SESSION_EVENT));
-}
-
-function clearStoredAuthSession() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
   window.localStorage.removeItem("bugbounty.token");
   window.localStorage.removeItem("bugbounty.role");
   window.localStorage.removeItem("bugbounty.address");
+  window.localStorage.removeItem("bugbounty.alias");
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
 
-export async function loginWithWallet(preferredAddress?: string) {
-  const address = await connectPreferredWallet(preferredAddress);
-  setPreferredWallet(address);
+function requireConnectedAddress() {
+  const account = getAccount(wagmiConfig);
+  if (!account.address) {
+    throw new Error("Conectá tu wallet para continuar.");
+  }
+  if (account.chainId !== CHAIN_ID) {
+    throw new Error("Cambiá tu wallet a la red Sepolia para continuar.");
+  }
+  return account.address.toLowerCase();
+}
+
+export async function loginWithWallet(address: string) {
   const nonce = await api<{ message: string }>("/auth/wallet/nonce", {
     method: "POST",
     body: JSON.stringify({ address }),
@@ -88,35 +83,53 @@ export async function loginWithWallet(preferredAddress?: string) {
   return verified;
 }
 
-export async function ensureWalletSession(expectedRoles?: string[], preferredAddress?: string) {
-  const connectedAddress = await connectPreferredWallet(preferredAddress ?? getPreferredWallet() ?? undefined);
-  const stored = getStoredSession();
+// De-dupes concurrent session establishment so two components mounting at once
+// never trigger two signature prompts for the same wallet.
+let inFlight: { address: string; promise: Promise<Session> } | null = null;
 
-  if (
-    stored &&
-    stored.address.toLowerCase() === connectedAddress.toLowerCase() &&
-    (!expectedRoles || expectedRoles.includes(stored.role))
-  ) {
+async function establishSession(address: string): Promise<Session> {
+  const stored = getStoredSession();
+  if (stored && stored.address.toLowerCase() === address) {
     try {
       const verified = await api<Session>("/me");
-      if (verified.address.toLowerCase() === connectedAddress.toLowerCase()) {
+      if (verified.address.toLowerCase() === address) {
         saveSession(verified);
         return verified;
       }
-      clearStoredAuthSession();
     } catch {
-      clearStoredAuthSession();
+      clearStoredSession();
     }
   }
+  return loginWithWallet(address);
+}
 
-  const verified = await loginWithWallet(connectedAddress);
-  if (verified.address.toLowerCase() !== connectedAddress.toLowerCase()) {
-    throw new Error("La cuenta conectada no coincide con la sesión actual.");
+export async function ensureWalletSession(expectedRoles?: string[]) {
+  const address = requireConnectedAddress();
+
+  if (!inFlight || inFlight.address !== address) {
+    inFlight = { address, promise: establishSession(address) };
   }
-  if (expectedRoles && !expectedRoles.includes(verified.role)) {
+
+  let session: Session;
+  try {
+    session = await inFlight.promise;
+  } finally {
+    inFlight = null;
+  }
+
+  if (expectedRoles && !expectedRoles.includes(session.role)) {
     throw new Error("Esta cuenta no tiene permisos para esta acción.");
   }
 
+  return session;
+}
+
+export async function refreshSessionAlias(alias: string | null) {
+  const verified = await api<Session>("/me", {
+    method: "PATCH",
+    body: JSON.stringify({ alias }),
+  });
+  saveSession(verified);
   return verified;
 }
 

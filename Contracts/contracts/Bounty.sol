@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
 import "./interfaces/IBountyResolution.sol";
 import "./interfaces/IDisputeContract.sol";
 
-contract Bounty is IBountyResolution {
+contract Bounty is IBountyResolution, Ownable, ReentrancyGuard {
     enum Status { OPEN, CANCELLED, CLOSED }
     enum ReportStatus { PENDING, ACCEPTED, REJECTED, DISPUTED, RESOLVED }
 
@@ -26,7 +29,6 @@ contract Bounty is IBountyResolution {
         uint256 disputeId;
     }
 
-    address public company;
     uint256 public reward;
     Status public status;
     uint8 public activeReports;
@@ -38,20 +40,14 @@ contract Bounty is IBountyResolution {
     uint256 public constant DISPUTE_WINDOW = 3 days;
     IDisputeContract public disputeContract;
 
-
-    constructor(address _disputeContract) payable {
+    constructor(address _disputeContract) payable Ownable(msg.sender) {
         require(msg.value > 0, "Insufficient funds to open bounty");
         require(_disputeContract != address(0), "Invalid dispute contract");
         reward = msg.value;
-        company = msg.sender;
         status = Status.OPEN;
         disputeContract = IDisputeContract(_disputeContract);
+        disputeContract.registerBounty();
         emit BountyCreated(msg.sender, msg.value);
-    }
-
-    modifier onlyCompany() {
-        require(msg.sender == company, "Only the company can perform this action");
-        _;
     }
 
     modifier onlyOldestPending(uint reportId) {
@@ -74,13 +70,18 @@ contract Bounty is IBountyResolution {
         _;
     }
 
-    function cancelBounty() external onlyCompany openBounty {
+    /// @notice The company that funded and owns this bounty.
+    function company() external view returns (address) {
+        return owner();
+    }
+
+    function cancelBounty() external onlyOwner openBounty nonReentrant {
         require(activeReports == 0, "Cannot cancel with active reports");
         require(disputedReports == 0, "Cannot cancel with active disputes");
         require(block.timestamp > lastRejectedAt + DISPUTE_WINDOW, "Dispute window still active");
         status = Status.CANCELLED;
         emit BountyCancelled();
-        payable(company).transfer(address(this).balance);
+        _transfer(owner(), address(this).balance);
     }
 
     function getBalance() external view returns (uint) {
@@ -88,7 +89,7 @@ contract Bounty is IBountyResolution {
     }
 
     function submitReport(bytes32 reportHash) external openBounty {
-        require(msg.sender != company, "Company cannot submit reports");
+        require(msg.sender != owner(), "Company cannot submit reports");
         reports[reportCount] = Report({
             hunter: msg.sender,
             hash: reportHash,
@@ -107,7 +108,7 @@ contract Bounty is IBountyResolution {
         return reports[reportId];
     }
 
-    function acceptReport(uint reportId) external onlyCompany openBounty onlyOldestPending(reportId) noActiveDisputes {
+    function acceptReport(uint reportId) external onlyOwner openBounty onlyOldestPending(reportId) noActiveDisputes nonReentrant {
         Report storage report = reports[reportId];
         require(report.status == ReportStatus.PENDING, "Report must be pending");
         require(block.timestamp > lastRejectedAt + DISPUTE_WINDOW, "Dispute window still active");
@@ -117,10 +118,10 @@ contract Bounty is IBountyResolution {
         status = Status.CLOSED;
         emit ReportAccepted(reportId, report.hunter);
         emit BountyClosed(reportId, report.hunter);
-        payable(report.hunter).transfer(reward);
+        _transfer(report.hunter, reward);
     }
 
-    function rejectReport(uint reportId) external onlyCompany openBounty onlyOldestPending(reportId) noActiveDisputes {
+    function rejectReport(uint reportId) external onlyOwner openBounty onlyOldestPending(reportId) noActiveDisputes {
         Report storage report = reports[reportId];
         require(report.status == ReportStatus.PENDING, "Report must be pending");
         report.status = ReportStatus.REJECTED;
@@ -143,7 +144,7 @@ contract Bounty is IBountyResolution {
         emit ReportDisputed(reportId, report.disputeId, msg.sender);
     }
 
-    function resolveDispute(uint256 reportId, DisputeResult result) external onlyDisputeContract {
+    function resolveDispute(uint256 reportId, DisputeResult result) external onlyDisputeContract nonReentrant {
         require(reportId < reportCount, "Report does not exist");
         Report storage report = reports[reportId];
         require(report.status == ReportStatus.DISPUTED, "Report must be disputed");
@@ -156,11 +157,20 @@ contract Bounty is IBountyResolution {
             status = Status.CLOSED;
             emit ReportAccepted(reportId, report.hunter);
             emit BountyClosed(reportId, report.hunter);
-            payable(report.hunter).transfer(reward);
+            _transfer(report.hunter, reward);
             return;
         }
 
         report.status = ReportStatus.RESOLVED;
     }
 
+    /// @dev Single funds-transfer primitive used across the contract: `.call` with a
+    ///      success check. Preferred over `.transfer()`, which only forwards 2300 gas
+    ///      and breaks for smart-contract wallets (Safe/multisig) and future opcode
+    ///      gas repricing. Reentrancy is contained by `nonReentrant` on the callers and
+    ///      by applying state changes before the transfer (checks-effects-interactions).
+    function _transfer(address to, uint256 amount) private {
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success, "Transfer failed");
+    }
 }
