@@ -11,7 +11,7 @@ import { WagmiProvider } from "wagmi";
 import { wagmiConfig } from "../lib/wagmi";
 
 const auroraTheme = darkTheme({
-  accentColor: "#38bdf8",
+  accentColor: "#2f6f8f",
   accentColorForeground: "#04101f",
   borderRadius: "medium",
   overlayBlur: "small",
