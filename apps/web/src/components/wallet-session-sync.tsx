@@ -12,10 +12,16 @@ import { clearStoredSession, ensureWalletSession, getStoredSession } from "../li
  * signature). On disconnect or account switch it clears the stale session.
  */
 export function WalletSessionSync() {
-  const { address, chainId, isConnected } = useAccount();
+  const { address, chainId, isConnected, status } = useAccount();
   const lastLoggedIn = useRef<string | null>(null);
 
   useEffect(() => {
+    // Mientras wagmi restaura la conexión previa al montar, isConnected es
+    // brevemente false. No borres la sesión en esa ventana transitoria, o una
+    // simple recarga deslogueaería al usuario.
+    if (status === "connecting" || status === "reconnecting") {
+      return;
+    }
     if (!isConnected || !address) {
       lastLoggedIn.current = null;
       clearStoredSession();
@@ -40,7 +46,7 @@ export function WalletSessionSync() {
       // User may reject the signature; protected actions will prompt again.
       lastLoggedIn.current = null;
     });
-  }, [address, chainId, isConnected]);
+  }, [address, chainId, isConnected, status]);
 
   return null;
 }

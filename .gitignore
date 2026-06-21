@@ -7,3 +7,4 @@ storage
 coverage
 apps/api/uploads
 apps/api/.data
+tsconfig.tsbuildinfo
