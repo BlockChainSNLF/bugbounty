@@ -4,6 +4,8 @@ export type WalletSession = {
   token: string;
   address: string;
   role: Role;
+  /** Superusuario (ADMIN_WALLET). Independiente del rol real; solo lo usa la consola admin. */
+  isAdmin: boolean;
   companyApproved: boolean;
   alias: string | null;
 };
