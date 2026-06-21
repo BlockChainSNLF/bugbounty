@@ -3,6 +3,7 @@ import {
   getAccount,
   signMessage as wagmiSignMessage,
   waitForTransactionReceipt as wagmiWaitForTransactionReceipt,
+  watchAccount,
   writeContract,
 } from "@wagmi/core";
 import type { Abi } from "viem";
@@ -19,6 +20,15 @@ type EthereumProvider = { request(args: { method: string; params?: unknown[] | o
 /** Direcciones ya autorizadas en el provider al que wagmi está conectado. */
 export function getWalletAccounts(): string[] {
   return (getAccount(wagmiConfig).addresses ?? []).map((entry) => entry.toLowerCase());
+}
+
+/** Suscribe a cambios de cuentas autorizadas; devuelve unsubscribe. */
+export function watchWalletAccounts(onChange: (accounts: string[]) => void): () => void {
+  return watchAccount(wagmiConfig, {
+    onChange(acc) {
+      onChange((acc.addresses ?? []).map((a) => a.toLowerCase()));
+    },
+  });
 }
 
 /**

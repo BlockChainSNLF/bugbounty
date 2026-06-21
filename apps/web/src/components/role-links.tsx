@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useDisconnect } from "wagmi";
 
 import { SESSION_EVENT, getStoredSession, refreshSessionAlias } from "../lib/session";
-import { getWalletAccounts, promptAccountSelection } from "../lib/wallet";
+import { getWalletAccounts, promptAccountSelection, watchWalletAccounts } from "../lib/wallet";
 import { explorerAddressUrl, shortHash } from "../lib/explorer";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -65,10 +65,10 @@ function AliasEditor({ current, onClose }: { current: string | null; onClose: ()
 }
 
 function AccountSwitcher({ activeAddress }: { activeAddress: string }) {
-  const [accounts, setAccounts] = useState<string[]>([]);
+  const [accounts, setAccounts] = useState<string[]>(() => getWalletAccounts());
 
   useEffect(() => {
-    setAccounts(getWalletAccounts());
+    return watchWalletAccounts(setAccounts);
   }, []);
 
   const others = accounts.filter((entry) => entry !== activeAddress.toLowerCase());
