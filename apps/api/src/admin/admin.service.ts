@@ -41,6 +41,15 @@ export class AdminService {
     };
   }
 
+  async removeCompany(address: string) {
+    await this.db.query(
+      `update users set role = 'hunter', company_approved = false
+       where address = $1 and role = 'company'`,
+      [address.toLowerCase()],
+    );
+    return { address: address.toLowerCase(), removed: true };
+  }
+
   async removeArbitrator(address: string) {
     await this.db.query(
       `delete from users

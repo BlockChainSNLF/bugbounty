@@ -238,6 +238,7 @@ export default function AdminPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [pendingArbitratorRemoval, setPendingArbitratorRemoval] = useState<string | null>(null);
+  const [pendingCompanyRemoval, setPendingCompanyRemoval] = useState<string | null>(null);
 
   async function loadOverview() {
     const response = await api<Overview>("/admin/overview");
@@ -276,6 +277,19 @@ export default function AdminPage() {
       mounted = false;
     };
   }, [session]);
+
+  async function removeCompany(address: string) {
+    try {
+      setPendingCompanyRemoval(address);
+      setOverviewError(null);
+      await api(`/admin/companies/${address}`, { method: "DELETE" });
+      await loadOverview();
+    } catch (caught) {
+      setOverviewError(caught instanceof Error ? caught.message : "No pudimos quitar a la empresa");
+    } finally {
+      setPendingCompanyRemoval(null);
+    }
+  }
 
   async function removeArbitrator(address: string) {
     try {
@@ -353,7 +367,19 @@ export default function AdminPage() {
                   <strong>{trimAddress(company.address)}</strong>
                   <span>{company.company_approved ? "Aprobada" : "Pendiente"}</span>
                 </div>
-                <time>{new Date(company.created_at).toLocaleDateString("es-AR")}</time>
+                <div className="session-cluster">
+                  <time>{new Date(company.created_at).toLocaleDateString("es-AR")}</time>
+                  {company.company_approved ? (
+                    <button
+                      className="session-exit"
+                      disabled={pendingCompanyRemoval === company.address}
+                      onClick={() => void removeCompany(company.address)}
+                      type="button"
+                    >
+                      {pendingCompanyRemoval === company.address ? "Quitando..." : "Quitar"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             )) : <p>Sin empresas registradas.</p>}
           </div>

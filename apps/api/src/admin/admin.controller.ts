@@ -25,6 +25,15 @@ export class AdminController {
     return this.adminService.approveCompany(address);
   }
 
+  @Delete("companies/:address")
+  async removeCompany(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("address") address: string,
+  ) {
+    await this.authService.requireRole(authorization, ["admin"]);
+    return this.adminService.removeCompany(address);
+  }
+
   @Post("arbitrators")
   async registerArbitrator(
     @Headers("authorization") authorization: string | undefined,
