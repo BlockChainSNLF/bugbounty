@@ -468,11 +468,6 @@ label span {
 }
 .surface-card {
   padding: 24px;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-.surface-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--border-strong);
 }
 .surface-card h2 {
   margin-top: 14px;

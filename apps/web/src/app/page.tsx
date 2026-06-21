@@ -1,7 +1,6 @@
 "use client";
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -140,10 +139,10 @@ export default function HomePage() {
         <div className="section-kicker">Entrá según tu rol</div>
         <div className="surface-grid">
           {ROLES.map((role) => (
-            <Link key={role.href} href={role.href} className="surface-card">
+            <div key={role.title} className="surface-card">
               <h2>{role.title}</h2>
               <p>{role.desc}</p>
-            </Link>
+            </div>
           ))}
         </div>
       </section>
