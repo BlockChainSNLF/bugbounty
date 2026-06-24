@@ -7,3 +7,6 @@ storage
 coverage
 apps/api/uploads
 apps/api/.data
+
+.vercel
+.env*

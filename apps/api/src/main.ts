@@ -53,8 +53,8 @@ loadEnvFile();
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const allowedOrigins = [
-    process.env.APP_URL ?? "http://localhost:3000",
-    process.env.ADMIN_APP_URL ?? "http://localhost:3001",
+    process.env.APP_URL ?? "http://10.151.22.102:3000",
+    process.env.ADMIN_APP_URL ?? "http://10.151.22.102:3001",
   ];
   app.enableCors({
     origin: allowedOrigins,
