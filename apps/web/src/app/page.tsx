@@ -77,7 +77,6 @@ export default function HomePage() {
           </p>
           <div className="hero-cta">
             <button type="button" onClick={openConnectModal}>Conectar wallet</button>
-            <a href="#como" className="secondary-link button-link">Cómo funciona</a>
           </div>
           <div className="hero-stats">
             <div>
