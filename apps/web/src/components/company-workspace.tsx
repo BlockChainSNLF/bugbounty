@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { CompanyBountiesPanel, RegisterBountyForm } from "./forms";
 import { api } from "../lib/api";
+import { getStoredSession, SESSION_EVENT } from "../lib/session";
 
 type Session = { address: string; role: string };
 type Tab = "programs" | "create";
@@ -16,25 +17,49 @@ export function CompanyWorkspace() {
   const [tab, setTab] = useState<Tab>("programs");
 
   useEffect(() => {
+    let cancelled = false;
+
+    // Re-deriva la sesión cada vez que cambia (login, switch de cuenta, otra
+    // pestaña). Sin esto la vista quedaba con la sesión leída al montar y, si
+    // perdía la carrera contra WalletSessionSync, mostraba el estado vacío para
+    // siempre. Mismo patrón de escucha que RoleLinks (header).
     async function load() {
       try {
-        setLoading(true);
         setError(null);
-        const token = window.localStorage.getItem("bugbounty.token");
-        if (!token) {
-          setSession(null);
+        const stored = getStoredSession();
+        if (!stored) {
+          if (!cancelled) {
+            setSession(null);
+            setLoading(false);
+          }
           return;
         }
+        // Pinta el workspace al instante con el rol cacheado y revalida con /me.
+        if (!cancelled) {
+          setSession({ address: stored.address, role: stored.role });
+          setLoading(false);
+        }
         const me = await api<Session>("/me");
-        setSession(me);
+        if (!cancelled) {
+          setSession(me);
+        }
       } catch (caught) {
-        setSession(null);
-        setError(caught instanceof Error ? caught.message : "No pudimos cargar tu sesión de empresa");
-      } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setSession(null);
+          setError(caught instanceof Error ? caught.message : "No pudimos cargar tu sesión de empresa");
+          setLoading(false);
+        }
       }
     }
+
     void load();
+    window.addEventListener(SESSION_EVENT, load);
+    window.addEventListener("storage", load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SESSION_EVENT, load);
+      window.removeEventListener("storage", load);
+    };
   }, []);
 
   if (loading) {
