@@ -27,6 +27,7 @@ type Dispute = {
   result: string | null;
   bounty_address?: string | null;
   bounty_title?: string | null;
+  report_uuid?: string | null;
   report_title?: string | null;
   report_description?: string | null;
   report_status?: string | null;
@@ -210,16 +211,23 @@ export function ArbitratorPanel() {
           <p>Cuando se te asigne un caso, va a aparecer acá con su evidencia y las opciones para votar.</p>
         </div>
       ) : (
-        assignedDisputes.map((dispute) => (
+        assignedDisputes.map((dispute) => {
+          const myVote = dispute.votes?.find((vote) => vote.arbitrator_address.toLowerCase() === session.address.toLowerCase());
+          const isFinalized = dispute.status === "FINALIZED";
+          const votingDisabled = pendingVoteId === dispute.id || isFinalized || Boolean(myVote);
+          return (
           <article className="panel grid" key={dispute.id}>
             <div className="stack-row">
               <div>
                 <h3>{dispute.report_title ?? "Disputa sin título"}</h3>
                 <p className="muted">{dispute.bounty_title ?? "Programa sin nombre"}</p>
               </div>
-              <div className="badge">
-                <span>Estado</span>
-                <span>{dispute.status}</span>
+              <div className="row-actions">
+                {dispute.report_uuid ? <a className="tx-link" href={`/reports/${dispute.report_uuid}`}>Ver evidencia</a> : null}
+                <div className="badge">
+                  <span>Estado</span>
+                  <span>{dispute.status}</span>
+                </div>
               </div>
             </div>
 
@@ -254,23 +262,30 @@ export function ArbitratorPanel() {
               )}
             </div>
 
+            {myVote ? (
+              <p className="muted" style={{ margin: 0 }}>Ya emitiste tu voto en este caso. Esperá a que el resto del panel decida.</p>
+            ) : isFinalized ? (
+              <p className="muted" style={{ margin: 0 }}>El caso ya está cerrado.</p>
+            ) : null}
+
             <div className="vote-actions">
               <button
-                disabled={pendingVoteId === dispute.id || dispute.status === "FINALIZED"}
+                disabled={votingDisabled}
                 onClick={() => void castVote(dispute, 0)}
               >
                 {pendingVoteId === dispute.id ? "Enviando voto..." : `Favorecer al hunter (${disputeResultLabels[0]})`}
               </button>
               <button
                 className="secondary"
-                disabled={pendingVoteId === dispute.id || dispute.status === "FINALIZED"}
+                disabled={votingDisabled}
                 onClick={() => void castVote(dispute, 1)}
               >
                 {pendingVoteId === dispute.id ? "Enviando voto..." : `Favorecer a la empresa (${disputeResultLabels[1]})`}
               </button>
             </div>
           </article>
-        ))
+          );
+        })
       )}
     </section>
   );

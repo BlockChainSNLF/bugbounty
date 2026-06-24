@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { NestFactory } from "@nestjs/core";
+import { json, urlencoded } from "express";
 
 import { AppModule } from "./app.module.js";
 
@@ -51,7 +52,9 @@ function loadEnvFile() {
 loadEnvFile();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(json({ limit: "40mb" }));
+  app.use(urlencoded({ extended: true, limit: "40mb" }));
   const allowedOrigins = [
     process.env.APP_URL ?? "http://localhost:3030",
     process.env.ADMIN_APP_URL ?? "http://localhost:3001",

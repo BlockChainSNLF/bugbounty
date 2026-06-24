@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatEther, parseEther } from "viem";
+
+import {
+  MAX_ATTACHMENTS_PER_REPORT,
+  MAX_ATTACHMENT_BYTES,
+  isAllowedAttachmentMime,
+} from "@bugbounty/shared/attachments";
 
 import { api } from "../lib/api";
 import { bountyAbi, bountyBytecode } from "../lib/bounty-contract";
@@ -23,6 +29,36 @@ const SEVERITY_LABEL: Record<string, { label: string; cls: string }> = {
 function StatusPill({ status }: { status: string }) {
   const info = SEVERITY_LABEL[status] ?? { label: status, cls: "pill-info" };
   return <span className={`pill ${info.cls}`}>{info.label}</span>;
+}
+
+const ATTACHMENT_ACCEPT = ".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt";
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(`No pudimos leer "${file.name}"`));
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function validateFiles(files: File[]): string | null {
+  if (files.length > MAX_ATTACHMENTS_PER_REPORT) {
+    return `Podés adjuntar hasta ${MAX_ATTACHMENTS_PER_REPORT} archivos.`;
+  }
+  const maxMb = Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024));
+  for (const file of files) {
+    if (file.type && !isAllowedAttachmentMime(file.type)) {
+      return `Tipo no permitido (${file.name}). Aceptamos PDF, imágenes y texto.`;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      return `"${file.name}" supera el límite de ${maxMb}MB.`;
+    }
+  }
+  return null;
 }
 
 type BountyOption = {
@@ -227,6 +263,7 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
                   </div>
                   <div className="row-actions">
                     <StatusPill status={report.status} />
+                    <a className="tx-link" href={`/reports/${report.id}`}>Ver evidencia</a>
                     {report.tx_hash ? <a className="tx-link" href={explorerTxUrl(report.tx_hash)} target="_blank" rel="noopener noreferrer">{shortHash(report.tx_hash)} ↗</a> : null}
                     {report.status === "PENDING" ? (
                       <>
@@ -255,7 +292,10 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
                         {report.dispute_id ? ` · disputa ${report.dispute_result ?? report.dispute_status ?? "abierta"}` : ""}
                       </span>
                     </div>
-                    <StatusPill status={report.status} />
+                    <div className="row-actions">
+                      <a className="tx-link" href={`/reports/${report.id}`}>Ver evidencia</a>
+                      <StatusPill status={report.status} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -316,13 +356,15 @@ export function ProgramsList({ onReport }: { onReport(address: string): void }) 
 }
 
 export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted(): void; initialBounty?: string | null }) {
-  const [payload, setPayload] = useState({ bountyAddress: initialBounty ?? "", title: "", description: "", poc: "", content: "" });
+  const [payload, setPayload] = useState({ bountyAddress: initialBounty ?? "", title: "", description: "", poc: "" });
+  const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bounties, setBounties] = useState<BountyOption[]>([]);
   const [loadingBounties, setLoadingBounties] = useState(true);
   const [sessionAddress, setSessionAddress] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -358,6 +400,17 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
         if (selectedBounty && selectedBounty.company_address.toLowerCase() === session.address.toLowerCase()) {
           throw new Error("No podés reportar en un bounty de tu propia wallet empresa.");
         }
+        const filesError = validateFiles(files);
+        if (filesError) {
+          throw new Error(filesError);
+        }
+        const attachments = await Promise.all(
+          files.map(async (file) => ({
+            fileName: file.name,
+            mimeType: file.type || "application/octet-stream",
+            contentBase64: await readFileAsBase64(file),
+          })),
+        );
         const response = await api<{ id: string; reportHash: string; nextAction: { method: string } }>("/reports", {
           method: "POST",
           body: JSON.stringify({
@@ -365,7 +418,7 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
             title: payload.title,
             description: payload.description,
             poc: payload.poc,
-            attachments: [{ fileName: "poc.txt", mimeType: "text/plain", contentBase64: btoa(unescape(encodeURIComponent(payload.content || payload.poc))) }],
+            attachments,
           }),
         });
         const hash = await writeContractAction({
@@ -383,7 +436,11 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
           throw new Error(`El reporte quedó confirmado on-chain, pero falló la sincronización: ${caught instanceof Error ? caught.message : "error desconocido"}`);
         }
         toast.showSuccess("Reporte enviado y confirmado on-chain.");
-        setPayload({ bountyAddress: "", title: "", description: "", poc: "", content: "" });
+        setPayload({ bountyAddress: "", title: "", description: "", poc: "" });
+        setFiles([]);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
         onSubmitted();
         setResult(`Reporte confirmado. Código de seguimiento: ${shortHash(response.reportHash)}`);
       } catch (caught) {
@@ -424,9 +481,29 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
         <textarea value={payload.poc} onChange={(event) => setPayload({ ...payload, poc: event.target.value })} placeholder="Pasos para reproducir el hallazgo" />
       </label>
       <label>
-        <span>Proof of Concept <span className="muted" style={{ fontWeight: 400 }}>· opcional</span></span>
-        <textarea value={payload.content} onChange={(event) => setPayload({ ...payload, content: event.target.value })} placeholder="Comando, payload o snippet que dispara la vulnerabilidad" style={{ fontFamily: "var(--font-mono)", fontSize: 13 }} />
+        <span>Evidencia <span className="muted" style={{ fontWeight: 400 }}>· PDF, imágenes o texto · hasta {Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB c/u</span></span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={ATTACHMENT_ACCEPT}
+          onChange={(event) => {
+            const selected = Array.from(event.target.files ?? []);
+            setError(validateFiles(selected));
+            setFiles(selected);
+          }}
+        />
       </label>
+      {files.length ? (
+        <div className="grid" style={{ gap: 6, margin: "0 0 4px" }}>
+          {files.map((file) => (
+            <div className="list-row" key={`${file.name}-${file.size}`}>
+              <span style={{ overflowWrap: "anywhere" }}>{file.name}</span>
+              <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>{(file.size / 1024).toFixed(0)} KB</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <button disabled={submitting || isOwnBounty || !payload.bountyAddress} type="submit">{submitting ? "Enviando reporte…" : "Guardar y confirmar on-chain"}</button>
       <p className="muted" style={{ margin: 0, fontSize: 12 }}>La evidencia se guarda privada off-chain y su hash queda registrado on-chain como prueba de autoría.</p>
       {result ? <p style={{ color: "var(--success)" }}>{result}</p> : null}
@@ -511,6 +588,7 @@ export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
             </span>
           </div>
           <div className="row-actions">
+            <a className="tx-link" href={`/reports/${report.id}`}>Ver evidencia</a>
             {report.tx_hash ? <a className="tx-link" href={explorerTxUrl(report.tx_hash)} target="_blank" rel="noopener noreferrer">{shortHash(report.tx_hash)} ↗</a> : null}
             {report.status === "OFFCHAIN_STORED" ? (
               <button disabled={pendingResubmit === report.id} onClick={async () => {

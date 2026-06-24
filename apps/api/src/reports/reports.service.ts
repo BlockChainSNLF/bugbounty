@@ -1,8 +1,18 @@
 import { randomUUID } from "node:crypto";
 
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 
-import { buildCanonicalReportPayload, buildReportHash, serializeCanonicalReport } from "@bugbounty/shared";
+import {
+  ALLOWED_ATTACHMENT_MIME,
+  MAX_ATTACHMENTS_PER_REPORT,
+  MAX_ATTACHMENT_BYTES,
+  base64ByteLength,
+  buildCanonicalReportPayload,
+  buildReportHash,
+  isAllowedAttachmentMime,
+  serializeCanonicalReport,
+} from "@bugbounty/shared";
+import type { WalletSession } from "@bugbounty/shared";
 
 import { DatabaseService } from "../db/database.service.js";
 import { StorageService } from "../storage/storage.service.js";
@@ -35,6 +45,7 @@ export class ReportsService {
     poc: string;
     attachments: AttachmentDto[];
   }) {
+    this.validateAttachments(payload.attachments);
     const id = randomUUID();
     const normalizedAuthorAddress = payload.authorAddress.toLowerCase();
     const bounty = await this.db.query<{ address: string; company_address: string }>(
@@ -87,13 +98,77 @@ export class ReportsService {
     };
   }
 
+  private validateAttachments(attachments: AttachmentDto[] | undefined) {
+    if (!attachments || attachments.length === 0) {
+      return;
+    }
+    if (attachments.length > MAX_ATTACHMENTS_PER_REPORT) {
+      throw new BadRequestException(`Podés adjuntar hasta ${MAX_ATTACHMENTS_PER_REPORT} archivos por reporte.`);
+    }
+    const maxMb = Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024));
+    for (const attachment of attachments) {
+      if (!isAllowedAttachmentMime(attachment.mimeType)) {
+        throw new BadRequestException(
+          `Tipo de archivo no permitido (${attachment.fileName || attachment.mimeType}). Aceptamos: ${ALLOWED_ATTACHMENT_MIME.join(", ")}.`,
+        );
+      }
+      if (base64ByteLength(attachment.contentBase64) > MAX_ATTACHMENT_BYTES) {
+        throw new BadRequestException(`El archivo "${attachment.fileName}" supera el límite de ${maxMb}MB.`);
+      }
+    }
+  }
+
   async getById(id: string) {
-    const report = await this.db.query<ReportDetails>("select * from reports where id = $1", [id]);
+    const report = await this.db.query<ReportDetails>(
+      "select r.*, b.company_address from reports r join bounties b on b.address = r.bounty_address where r.id = $1",
+      [id],
+    );
     if (!report.rows[0]) {
       throw new NotFoundException("Report not found");
     }
-    const files = await this.db.query("select file_name, mime_type, sha256, storage_path from report_files where report_id = $1", [id]);
-    return { ...report.rows[0], files: files.rows };
+    const files = await this.db.query("select id, file_name, mime_type, sha256 from report_files where report_id = $1 order by id asc", [id]);
+    return {
+      ...report.rows[0],
+      files: files.rows.map((row) => {
+        const { id: fileId, ...rest } = row as { id: string | number; [key: string]: unknown };
+        return { fileId: String(fileId), ...rest };
+      }),
+    };
+  }
+
+  async assertCanViewReport(session: WalletSession, reportId: string) {
+    const result = await this.db.query<{ author_address: string; company_address: string }>(
+      `select r.author_address, b.company_address
+       from reports r
+       join bounties b on b.address = r.bounty_address
+       where r.id = $1`,
+      [reportId],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new NotFoundException("Report not found");
+    }
+    const actor = session.address.toLowerCase();
+    const allowed =
+      session.isAdmin ||
+      session.role === "arbitrator" ||
+      row.author_address.toLowerCase() === actor ||
+      row.company_address.toLowerCase() === actor;
+    if (!allowed) {
+      throw new ForbiddenException("No tenés permiso para ver este reporte");
+    }
+  }
+
+  async getFileForDownload(reportId: string, fileId: string) {
+    const result = await this.db.query<{ file_name: string; mime_type: string; storage_path: string }>(
+      "select file_name, mime_type, storage_path from report_files where id = $1 and report_id = $2",
+      [fileId, reportId],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      throw new NotFoundException("File not found");
+    }
+    return row;
   }
 
   async listByAuthor(authorAddress: string) {

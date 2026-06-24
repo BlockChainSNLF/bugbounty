@@ -26,4 +26,17 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export async function apiBlobUrl(path: string): Promise<string> {
+  const token = typeof window !== "undefined" ? window.localStorage.getItem("bugbounty.token") : null;
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}
+
 export { API_URL };

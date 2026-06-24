@@ -1,4 +1,7 @@
-import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
+import { createReadStream } from "node:fs";
+
+import { Body, Controller, Get, Headers, Param, Post, Res, StreamableFile } from "@nestjs/common";
+import type { Response } from "express";
 
 import { AuthService } from "../auth/auth.service.js";
 import { ReportsService } from "./reports.service.js";
@@ -32,8 +35,25 @@ export class ReportsController {
   }
 
   @Get(":id")
-  getOne(@Param("id") id: string) {
+  async getOne(@Headers("authorization") authorization: string | undefined, @Param("id") id: string) {
+    const session = await this.authService.requireSession(authorization);
+    await this.reportsService.assertCanViewReport(session, id);
     return this.reportsService.getById(id);
+  }
+
+  @Get(":id/files/:fileId")
+  async downloadFile(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+    @Param("fileId") fileId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const session = await this.authService.requireSession(authorization);
+    await this.reportsService.assertCanViewReport(session, id);
+    const file = await this.reportsService.getFileForDownload(id, fileId);
+    res.setHeader("Content-Type", file.mime_type);
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file.file_name)}"`);
+    return new StreamableFile(createReadStream(file.storage_path));
   }
 
   @Post(":id/dispute")
