@@ -272,7 +272,7 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
   );
 }
 
-export function CreateReportForm({ onSubmitted }: { onSubmitted(): void }) {
+export function CreateReportForm() {
   const [payload, setPayload] = useState({ bountyAddress: "", title: "", description: "", poc: "", fileName: "poc.txt", mimeType: "text/plain", content: "" });
   const [result, setResult] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -371,7 +371,6 @@ export function CreateReportForm({ onSubmitted }: { onSubmitted(): void }) {
         } catch (caught) {
           throw new Error(`El reporte quedó confirmado on-chain, pero falló la sincronización: ${caught instanceof Error ? caught.message : "error desconocido"}`);
         }
-        onSubmitted();
         setResult(`Reporte enviado y confirmado on-chain. Código de seguimiento: ${response.reportHash}`);
       } catch (caught) {
         setResult(caught instanceof Error ? caught.message : "No pudimos enviar el reporte");
@@ -438,7 +437,7 @@ export function CreateReportForm({ onSubmitted }: { onSubmitted(): void }) {
   );
 }
 
-export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
+export function HunterReportsPanel() {
   const [reports, setReports] = useState<Array<{
     id: string;
     bounty_address: string;
@@ -486,7 +485,7 @@ export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
     return () => {
       mounted = false;
     };
-  }, [refreshKey]);
+  }, []);
 
   async function openDispute(reportId: string, bountyAddress: `0x${string}`) {
     try {

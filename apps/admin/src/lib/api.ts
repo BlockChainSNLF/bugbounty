@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://10.151.22.102:4000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = typeof window !== "undefined" ? window.localStorage.getItem("bugbounty.admin.token") : null;

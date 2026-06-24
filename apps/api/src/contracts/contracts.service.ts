@@ -57,7 +57,6 @@ export class ContractsService implements OnModuleInit {
     let bountyLogs = 0;
     for (const row of bountyRows.rows) {
       bountyLogs += await this.syncContract(client, row.address as `0x${string}`, bountyAbi, latestBlock);
-      await this.reconcileBountyReports(client, row.address as `0x${string}`);
     }
     const disputeLogs = await this.syncContract(client, disputeAddress, disputeAbi, latestBlock);
     await this.reconcileArbitrators(client, disputeAddress);
@@ -81,7 +80,6 @@ export class ContractsService implements OnModuleInit {
     const latestBlock = await client.getBlockNumber();
 
     const bountyLogs = await this.syncContract(client, bountyAddress, bountyAbi, latestBlock);
-    await this.reconcileBountyReports(client, bountyAddress);
     const disputeLogs = await this.syncContract(client, disputeAddress, disputeAbi, latestBlock);
     await this.reconcileArbitrators(client, disputeAddress);
 
@@ -196,19 +194,12 @@ export class ContractsService implements OnModuleInit {
         break;
       case "ReportSubmitted":
         await this.db.query(
-          `with candidate as (
-             select id
-             from reports
-             where bounty_address = $3
-               and lower(author_address) = $4
-               and report_id_on_chain is null
-             order by created_at asc
-             limit 1
-           )
-           update reports
+          `update reports
            set report_id_on_chain = $1,
                status = $2
-           where id in (select id from candidate)`,
+           where bounty_address = $3
+             and author_address = $4
+             and report_id_on_chain is null`,
           [
             Number(args.reportId),
             reportStatusLabels[0],
@@ -339,57 +330,6 @@ export class ContractsService implements OnModuleInit {
           [address],
         );
       }
-    }
-  }
-
-  private async reconcileBountyReports(
-    client: ReturnType<typeof createPublicClient>,
-    bountyAddress: `0x${string}`,
-  ) {
-    const reportCount = await client.readContract({
-      address: bountyAddress,
-      abi: bountyAbi,
-      functionName: "reportCount",
-    });
-
-    for (let reportId = 0n; reportId < reportCount; reportId += 1n) {
-      const report = await client.readContract({
-        address: bountyAddress,
-        abi: bountyAbi,
-        functionName: "getReport",
-        args: [reportId],
-      });
-
-      const hunterAddress = report.hunter.toLowerCase();
-      const reportHash = report.hash.toLowerCase();
-      const status = reportStatusLabels[Number(report.status)];
-
-      await this.db.query(
-        `with candidate as (
-           select id
-           from reports
-           where bounty_address = $1
-             and lower(author_address) = $2
-             and lower(report_hash) = $3
-             and (
-               report_id_on_chain is null
-               or report_id_on_chain = $4
-             )
-           order by created_at asc
-           limit 1
-         )
-         update reports
-         set report_id_on_chain = $4,
-             status = $5
-         where id in (select id from candidate)`,
-        [
-          bountyAddress.toLowerCase(),
-          hunterAddress,
-          reportHash,
-          Number(reportId),
-          status,
-        ],
-      );
     }
   }
 }

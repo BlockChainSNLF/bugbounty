@@ -6,7 +6,6 @@ npm install
 cd ..
 docker compose up -d postgres
 
-## Con este lo levantás:
 docker start bugbounty-postgres
 ```
 
