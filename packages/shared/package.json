@@ -14,6 +14,10 @@
       "types": "./src/contracts.ts",
       "default": "./dist/contracts.js"
     },
+    "./attachments": {
+      "types": "./src/attachments.ts",
+      "default": "./dist/attachments.js"
+    },
     "./types": {
       "types": "./src/types.ts",
       "default": "./dist/types.js"
