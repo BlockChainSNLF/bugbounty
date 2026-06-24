@@ -4,6 +4,7 @@ dist
 .env
 .env.local
 storage
+!apps/api/src/storage/
 coverage
 apps/api/uploads
 apps/api/.data
