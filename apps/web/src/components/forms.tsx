@@ -6,7 +6,7 @@ import { formatEther, parseEther } from "viem";
 import { api } from "../lib/api";
 import { bountyAbi, bountyBytecode } from "../lib/bounty-contract";
 import { ensureWalletSession, getPreferredWallet } from "../lib/session";
-import { deployContractAction, waitForTransactionReceipt, writeContractAction } from "../lib/wallet";
+import { deployContractAction, waitForTransactionReceipt, walletErrorMessage, writeContractAction } from "../lib/wallet";
 import { explorerTxUrl, shortHash } from "../lib/explorer";
 import { AddressDisplay } from "./address-display";
 import { useToast } from "./toast";
@@ -79,7 +79,7 @@ export function RegisterBountyForm({ onCreated }: { onCreated(): Promise<unknown
         setPayload({ title: "", description: "", outOfScope: "", rewardEth: "1.0" });
         await onCreated();
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "No pudimos crear el programa");
+        setError(walletErrorMessage(caught, "No pudimos crear el programa"));
       } finally {
         setSubmitting(false);
       }
@@ -170,7 +170,7 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
       toast.showSuccess(action === "accept" ? "Reporte aceptado y recompensa liberada." : "Reporte rechazado.");
       await loadBounties();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No pudimos resolver el reporte");
+      setError(walletErrorMessage(caught, "No pudimos resolver el reporte"));
     } finally {
       setPendingAction(null);
     }
@@ -387,7 +387,7 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
         onSubmitted();
         setResult(`Reporte confirmado. Código de seguimiento: ${shortHash(response.reportHash)}`);
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "No pudimos enviar el reporte");
+        setError(walletErrorMessage(caught, "No pudimos enviar el reporte"));
       } finally {
         setSubmitting(false);
       }
@@ -515,7 +515,7 @@ export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
             {report.status === "OFFCHAIN_STORED" ? (
               <button disabled={pendingResubmit === report.id} onClick={async () => {
                 try { setPendingResubmit(report.id); setError(null); await runIntent(report.id, report.bounty_address as `0x${string}`, "resubmit", "Confirmando on-chain…"); }
-                catch (caught) { setError(caught instanceof Error ? caught.message : "No pudimos confirmar el reporte"); }
+                catch (caught) { setError(walletErrorMessage(caught, "No pudimos confirmar el reporte")); }
                 finally { setPendingResubmit(null); }
               }} type="button">
                 {pendingResubmit === report.id ? "Confirmando…" : "Confirmar on-chain"}
@@ -524,7 +524,7 @@ export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
             {report.status === "REJECTED" ? (
               <button disabled={pendingDispute === report.id} onClick={async () => {
                 try { setPendingDispute(report.id); setError(null); await runIntent(report.id, report.bounty_address as `0x${string}`, "dispute", "Abriendo disputa…"); }
-                catch (caught) { setError(caught instanceof Error ? caught.message : "No pudimos abrir la disputa"); }
+                catch (caught) { setError(walletErrorMessage(caught, "No pudimos abrir la disputa")); }
                 finally { setPendingDispute(null); }
               }} type="button">
                 {pendingDispute === report.id ? "Abriendo…" : "Disputar"}

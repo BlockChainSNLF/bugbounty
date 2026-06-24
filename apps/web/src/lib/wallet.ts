@@ -15,6 +15,30 @@ export function getActiveWalletAccount() {
   return getAccount(wagmiConfig).address?.toLowerCase() ?? null;
 }
 
+/**
+ * Traduce los errores de wallet/viem a un mensaje corto y legible.
+ * Los errores crudos de viem traen el dump completo de la transacción (value,
+ * data hex de cientos de chars, etc.); mostrarlos tal cual desbordaba la UI.
+ */
+export function walletErrorMessage(caught: unknown, fallback: string): string {
+  const raw = caught instanceof Error ? caught.message : "";
+  const text = raw.toLowerCase();
+  if (
+    text.includes("user rejected") ||
+    text.includes("user denied") ||
+    text.includes("rejected the request")
+  ) {
+    return "Cancelaste la operación en la wallet.";
+  }
+  if (text.includes("insufficient funds")) {
+    return "La wallet no tiene fondos suficientes para cubrir la recompensa y el gas.";
+  }
+  // Para el resto, usamos solo la primera línea: viem mete los detalles crudos
+  // (Request Arguments, data hex) en líneas siguientes.
+  const firstLine = raw.split("\n")[0]?.trim();
+  return firstLine || fallback;
+}
+
 type EthereumProvider = { request(args: { method: string; params?: unknown[] | object }): Promise<unknown> };
 
 /** Direcciones ya autorizadas en el provider al que wagmi está conectado. */
