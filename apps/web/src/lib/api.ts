@@ -25,7 +25,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(message);
   }
 
-  return response.json() as Promise<T>;
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error("Server returned an unexpected response. The service may be temporarily unavailable.");
+  }
 }
 
 export async function apiBlobUrl(path: string): Promise<string> {
