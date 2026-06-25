@@ -33,10 +33,13 @@ export function walletErrorMessage(caught: unknown, fallback: string): string {
   if (text.includes("insufficient funds")) {
     return "Insufficient wallet funds to cover the reward and gas.";
   }
-  // Para el resto, usamos solo la primera línea: viem mete los detalles crudos
-  // (Request Arguments, data hex) en líneas siguientes.
-  const firstLine = raw.split("\n")[0]?.trim();
-  return firstLine || fallback;
+  const lines = raw.split("\n").map((line) => line.trim()).filter(Boolean);
+  const reasonIndex = lines.findIndex((line) => /reverted with the following reason:?$/i.test(line));
+  if (reasonIndex !== -1 && lines[reasonIndex + 1]) {
+    return lines[reasonIndex + 1];
+  }
+  const revertedLine = lines.find((line) => /reverted/i.test(line));
+  return revertedLine || lines[0] || fallback;
 }
 
 type EthereumProvider = { request(args: { method: string; params?: unknown[] | object }): Promise<unknown> };
