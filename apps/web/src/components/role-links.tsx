@@ -224,7 +224,7 @@ export function RoleLinks() {
             }
             const alias = session?.alias?.trim();
             return (
-              <div className="account-pill" style={{ position: "relative" }}>
+              <div className="account-pill">
                 <button
                   type="button"
                   className="account-main"
