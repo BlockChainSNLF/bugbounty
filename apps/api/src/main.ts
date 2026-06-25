@@ -55,6 +55,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.use(json({ limit: "40mb" }));
   app.use(urlencoded({ extended: true, limit: "40mb" }));
+  app.use((req: { method: string; url: string }, _res: unknown, next: () => void) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    next();
+  });
   const allowedOrigins = [
     process.env.APP_URL ?? "http://localhost:3030",
     process.env.ADMIN_APP_URL ?? "http://localhost:3001",
