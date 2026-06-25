@@ -10,7 +10,6 @@ const ROLE_HOME: Record<string, string> = {
   hunter: "/hunter",
   company: "/company",
   arbitrator: "/arbitrator",
-  admin: "/company",
 };
 
 const STEPS = [
@@ -44,10 +43,13 @@ export default function HomePage() {
   useEffect(() => {
     const redirectIfLoggedIn = () => {
       const session = getStoredSession();
-      const dest = session ? ROLE_HOME[session.role] : null;
-      if (dest) {
-        router.replace(dest);
+      if (!session) return;
+      if (session.role === "admin") {
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL;
+        if (adminUrl) { window.location.href = adminUrl; return; }
       }
+      const dest = ROLE_HOME[session.role];
+      if (dest) router.replace(dest);
     };
     redirectIfLoggedIn();
     window.addEventListener(SESSION_EVENT, redirectIfLoggedIn);

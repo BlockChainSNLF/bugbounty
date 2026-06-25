@@ -13,7 +13,6 @@ const ROLE_HOME: Record<string, string> = {
   hunter: "/hunter",
   company: "/company",
   arbitrator: "/arbitrator",
-  admin: "/company",
 };
 
 const PROTECTED_PATHS = ["/hunter", "/company", "/arbitrator"];
@@ -54,6 +53,13 @@ export function WalletSessionSync() {
     lastLoggedIn.current = normalized;
     void ensureWalletSession()
       .then((session) => {
+        if (session.role === "admin" || session.isAdmin) {
+          const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL;
+          if (adminUrl) {
+            window.location.href = adminUrl;
+            return;
+          }
+        }
         router.replace(ROLE_HOME[session.role] ?? "/");
       })
       .catch((caught) => {
