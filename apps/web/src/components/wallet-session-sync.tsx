@@ -25,6 +25,7 @@ export function WalletSessionSync() {
   const lastLoggedIn = useRef<string | null>(null);
 
   useEffect(() => {
+    console.log("[WalletSync]", { status, isConnected, address, chainId, CHAIN_ID });
     // Mientras wagmi restaura la conexión previa al montar, isConnected es
     // brevemente false. No borres la sesión en esa ventana transitoria, o una
     // simple recarga deslogueaería al usuario.
