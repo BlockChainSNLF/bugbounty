@@ -63,6 +63,7 @@ async function bootstrap() {
     process.env.APP_URL ?? "http://localhost:3030",
     process.env.ADMIN_APP_URL ?? "http://localhost:3001",
   ];
+  console.log("CORS allowed origins:", allowedOrigins);
   app.enableCors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin || allowedOrigins.includes(origin)) {
