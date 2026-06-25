@@ -53,7 +53,11 @@ export class BountiesController {
   }
 
   @Get(":address/reports")
-  getReports(@Param("address") address: string) {
+  async getReports(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("address") address: string,
+  ) {
+    await this.authService.requireRole(authorization, ["company", "admin", "arbitrator"]);
     return this.bountiesService.getReports(address);
   }
 }

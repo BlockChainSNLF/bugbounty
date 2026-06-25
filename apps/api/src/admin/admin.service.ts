@@ -23,6 +23,10 @@ export class AdminService {
   }
 
   async registerArbitrator(address: string) {
+    const contract = process.env.DISPUTE_ADDRESS;
+    if (!contract) {
+      throw new Error("DISPUTE_ADDRESS is not configured");
+    }
     await this.db.query(
       `insert into users (address, role, company_approved)
        values ($1, 'arbitrator', false)
@@ -34,7 +38,7 @@ export class AdminService {
       address: address.toLowerCase(),
       role: "arbitrator",
       nextAction: {
-        contract: process.env.DISPUTE_ADDRESS,
+        contract,
         method: "registerArbitrator",
         args: [address.toLowerCase()],
       },
@@ -51,6 +55,10 @@ export class AdminService {
   }
 
   async removeArbitrator(address: string) {
+    const contract = process.env.DISPUTE_ADDRESS;
+    if (!contract) {
+      throw new Error("DISPUTE_ADDRESS is not configured");
+    }
     await this.db.query(
       `delete from users
        where address = $1
@@ -62,7 +70,7 @@ export class AdminService {
       address: address.toLowerCase(),
       removed: true,
       nextAction: {
-        contract: process.env.DISPUTE_ADDRESS,
+        contract,
         method: "removeArbitrator",
         args: [address.toLowerCase()],
       },

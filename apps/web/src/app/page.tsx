@@ -10,6 +10,7 @@ const ROLE_HOME: Record<string, string> = {
   hunter: "/hunter",
   company: "/company",
   arbitrator: "/arbitrator",
+  admin: "/company",
 };
 
 const STEPS = [

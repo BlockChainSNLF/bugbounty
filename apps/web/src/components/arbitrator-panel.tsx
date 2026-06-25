@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { disputeResultLabels, disputeAbi } from "@bugbounty/shared/contracts";
 
@@ -42,10 +42,16 @@ export function ArbitratorPanel() {
   const [error, setError] = useState<string | null>(null);
   const [pendingVoteId, setPendingVoteId] = useState<string | null>(null);
   const toast = useToast();
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   async function loadDisputes() {
     const allDisputes = await api<Dispute[]>("/disputes");
-    setDisputes(allDisputes);
+    if (mountedRef.current) setDisputes(allDisputes);
     return allDisputes;
   }
 

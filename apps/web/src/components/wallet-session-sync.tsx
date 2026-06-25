@@ -13,6 +13,7 @@ const ROLE_HOME: Record<string, string> = {
   hunter: "/hunter",
   company: "/company",
   arbitrator: "/arbitrator",
+  admin: "/company",
 };
 
 const PROTECTED_PATHS = ["/hunter", "/company", "/arbitrator"];

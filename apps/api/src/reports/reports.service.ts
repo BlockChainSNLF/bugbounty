@@ -202,14 +202,32 @@ export class ReportsService {
   }
 
   async createDisputeIntent(id: string, actorAddress: string) {
-    const report = await this.getById(id);
+    const report = await this.db.query<{
+      bounty_address: string;
+      author_address: string;
+      report_id_on_chain: string | number | null;
+      status: string;
+    }>(
+      "select bounty_address, author_address, report_id_on_chain, status from reports where id = $1",
+      [id],
+    );
+    const row = report.rows[0];
+    if (!row) {
+      throw new NotFoundException("Report not found");
+    }
+    if (row.author_address.toLowerCase() !== actorAddress.toLowerCase()) {
+      throw new ForbiddenException("Only the report author can open a dispute");
+    }
+    if (row.report_id_on_chain === null || row.status !== "REJECTED") {
+      throw new ForbiddenException("Only rejected on-chain reports can be disputed");
+    }
     return {
       reportId: id,
       actorAddress,
       nextAction: {
-        contract: report.bounty_address,
+        contract: row.bounty_address,
         method: "disputeReport",
-        args: [String(report.report_id_on_chain ?? 0)],
+        args: [String(row.report_id_on_chain)],
       },
     };
   }
@@ -242,7 +260,7 @@ export class ReportsService {
       [row.bounty_address.toLowerCase()],
     );
     if (bounty.rows[0]?.company_address?.toLowerCase() === normalizedActorAddress) {
-      throw new ForbiddenException("La empresa no puede reportar vulnerabilidades en su propio bounty.");
+      throw new ForbiddenException("A company cannot report vulnerabilities on its own bounty.");
     }
     if (row.report_id_on_chain !== null || row.status !== "OFFCHAIN_STORED") {
       throw new NotFoundException("This report does not need on-chain resubmission");

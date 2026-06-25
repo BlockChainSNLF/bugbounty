@@ -10,26 +10,32 @@ import { parseBearer } from "../common/session.js";
 
 @Injectable()
 export class AuthService {
-  private readonly nonces = new Map<string, string>();
+  private readonly nonces = new Map<string, { nonce: string; expiresAt: number }>();
   private readonly sessions = new Map<string, WalletSession>();
+  private readonly NONCE_TTL_MS = 5 * 60 * 1000;
 
   constructor(private readonly db: DatabaseService) {}
 
   createNonce(address: string) {
+    const now = Date.now();
+    for (const [key, value] of this.nonces) {
+      if (value.expiresAt < now) this.nonces.delete(key);
+    }
     const nonce = randomBytes(16).toString("hex");
-    this.nonces.set(address.toLowerCase(), nonce);
+    this.nonces.set(address.toLowerCase(), { nonce, expiresAt: now + this.NONCE_TTL_MS });
     return { nonce, message: `BugBounty login nonce: ${nonce}` };
   }
 
   async verify(address: string, signature: `0x${string}`) {
     const normalizedAddress = address.toLowerCase();
-    const nonce = this.nonces.get(normalizedAddress);
-    if (!nonce) {
-      throw new UnauthorizedException("Nonce not found");
+    const nonceEntry = this.nonces.get(normalizedAddress);
+    if (!nonceEntry || nonceEntry.expiresAt < Date.now()) {
+      this.nonces.delete(normalizedAddress);
+      throw new UnauthorizedException("Nonce not found or expired");
     }
 
     const recovered = await recoverMessageAddress({
-      message: `BugBounty login nonce: ${nonce}`,
+      message: `BugBounty login nonce: ${nonceEntry.nonce}`,
       signature,
     });
 
