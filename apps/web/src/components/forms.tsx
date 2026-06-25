@@ -215,6 +215,29 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
     }
   }
 
+  async function cancelBounty(bountyAddress: `0x${string}`) {
+    try {
+      setPendingAction(`${bountyAddress}:cancel`);
+      const session = await ensureWalletSession(["company", "admin"]);
+      const hash = await writeContractAction({
+        address: bountyAddress,
+        abi: bountyAbi,
+        functionName: "cancelBounty",
+        args: [],
+        account: session.address as `0x${string}`,
+      });
+      toast.showTx("Cancelling bounty…", hash);
+      await waitForTransactionReceipt(hash);
+      await api(`/bounties/${bountyAddress}/sync`, { method: "POST" });
+      toast.showSuccess("Bounty cancelled. The locked reward was returned to your wallet.");
+      await loadBounties();
+    } catch (caught) {
+      setError(walletErrorMessage(caught, "Could not cancel the bounty"));
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   if (loading) {
     return <div className="empty">Loading your bounties…</div>;
   }
@@ -235,6 +258,9 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
       {bounties.map((bounty) => {
         const activeReports = bounty.reports.filter((report) => !["ACCEPTED", "RESOLVED"].includes(report.status));
         const resolvedReports = bounty.reports.filter((report) => ["ACCEPTED", "RESOLVED"].includes(report.status));
+        const hasBlockingReports = bounty.reports.some((report) => ["PENDING", "DISPUTED", "OFFCHAIN_STORED"].includes(report.status));
+        const hasAcceptedReport = bounty.reports.some((report) => report.status === "ACCEPTED");
+        const canCancel = !hasBlockingReports && !hasAcceptedReport;
         return (
           <article className="program-card" key={bounty.address}>
             <div className="stack-row">
@@ -299,6 +325,15 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : null}
+
+            {canCancel ? (
+              <div className="stack-row" style={{ alignItems: "center", marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+                <p className="muted" style={{ margin: 0, fontSize: 12, maxWidth: "48ch" }}>Cancel to close this bounty and return the locked reward to your wallet.</p>
+                <button className="secondary" style={{ width: "auto", padding: "8px 14px" }} disabled={pendingAction === `${bounty.address}:cancel`} onClick={() => void cancelBounty(bounty.address as `0x${string}`)} type="button">
+                  {pendingAction === `${bounty.address}:cancel` ? "Cancelling…" : "Cancel bounty"}
+                </button>
               </div>
             ) : null}
           </article>
