@@ -51,6 +51,9 @@ export function WalletSessionSync() {
       return;
     }
     lastLoggedIn.current = normalized;
+    // Only redirect to role home on a fresh login (no prior session for this address).
+    // If the user already had a session they're navigating intentionally — keep them where they are.
+    const alreadyHadSession = stored?.address.toLowerCase() === normalized;
     void ensureWalletSession()
       .then((session) => {
         if (session.role === "admin") {
@@ -60,7 +63,9 @@ export function WalletSessionSync() {
             return;
           }
         }
-        router.replace(ROLE_HOME[session.role] ?? "/");
+        if (!alreadyHadSession) {
+          router.replace(ROLE_HOME[session.role] ?? "/");
+        }
       })
       .catch((caught) => {
         lastLoggedIn.current = null;

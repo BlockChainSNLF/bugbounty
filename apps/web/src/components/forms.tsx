@@ -9,6 +9,8 @@ import {
   isAllowedAttachmentMime,
 } from "@bugbounty/shared/attachments";
 
+import Link from "next/link";
+
 import { api } from "../lib/api";
 import { bountyAbi, bountyBytecode } from "../lib/bounty-contract";
 import { ensureWalletSession, getPreferredWallet } from "../lib/session";
@@ -257,7 +259,7 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
               {activeReports.length ? activeReports.map((report) => (
                 <div className="list-row" key={report.id}>
                   <div>
-                    <a href={`/reports/${report.id}`} style={{ color: "var(--ink)", textDecoration: "none", fontWeight: 600 }}>{report.title}</a>
+                    <Link href={`/reports/${report.id}`} style={{ color: "var(--ink)", textDecoration: "none", fontWeight: 600 }}>{report.title}</Link>
                     <span style={{ display: "inline-flex", gap: 8, marginTop: 4 }}>
                       hunter <AddressDisplay address={report.author_address} alias={report.author_alias} link={false} />
                     </span>
@@ -286,7 +288,7 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
                 {resolvedReports.map((report) => (
                   <div className="list-row" key={report.id}>
                     <div>
-                      <a href={`/reports/${report.id}`} style={{ color: "var(--ink)", textDecoration: "none", fontWeight: 600 }}>{report.title}</a>
+                      <Link href={`/reports/${report.id}`} style={{ color: "var(--ink)", textDecoration: "none", fontWeight: 600 }}>{report.title}</Link>
                       <span style={{ display: "inline-flex", gap: 8, marginTop: 4 }}>
                         hunter <AddressDisplay address={report.author_address} alias={report.author_alias} link={false} />
                         {report.dispute_id ? ` · dispute ${report.dispute_result ?? report.dispute_status ?? "open"}` : ""}
@@ -593,7 +595,7 @@ export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
             </span>
           </div>
           <div className="row-actions">
-            <a className="tx-link" href={`/reports/${report.id}`}>View evidence</a>
+            <Link className="tx-link" href={`/reports/${report.id}`}>View evidence</Link>
             {report.tx_hash ? <a className="tx-link" href={explorerTxUrl(report.tx_hash)} target="_blank" rel="noopener noreferrer">{shortHash(report.tx_hash)} ↗</a> : null}
             {report.status === "OFFCHAIN_STORED" ? (
               <button disabled={pendingResubmit === report.id} onClick={async () => {
