@@ -22,6 +22,7 @@ export function WalletSessionSync() {
   const router = useRouter();
   const pathname = usePathname();
   const lastLoggedIn = useRef<string | null>(null);
+  const hasConnected = useRef(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -31,12 +32,13 @@ export function WalletSessionSync() {
     if (!isConnected || !address) {
       lastLoggedIn.current = null;
       clearStoredSession();
-      if (PROTECTED_PATHS.some((p) => pathname.startsWith(p))) {
+      if (hasConnected.current && PROTECTED_PATHS.some((p) => pathname.startsWith(p))) {
         router.replace("/");
       }
       return;
     }
 
+    hasConnected.current = true;
     const normalized = address.toLowerCase();
     const stored = getStoredSession();
     if (stored && stored.address.toLowerCase() !== normalized) {
