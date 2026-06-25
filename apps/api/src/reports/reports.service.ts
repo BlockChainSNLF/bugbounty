@@ -56,7 +56,7 @@ export class ReportsService {
       throw new NotFoundException("Unknown bounty");
     }
     if (bounty.rows[0].company_address.toLowerCase() === payload.authorAddress.toLowerCase()) {
-      throw new ForbiddenException("La empresa no puede reportar vulnerabilidades en su propio bounty.");
+      throw new ForbiddenException("A company cannot report vulnerabilities on its own bounty.");
     }
 
     const reportHash = buildReportHash(payload.title, payload.description, payload.poc, payload.attachments);
@@ -103,17 +103,17 @@ export class ReportsService {
       return;
     }
     if (attachments.length > MAX_ATTACHMENTS_PER_REPORT) {
-      throw new BadRequestException(`Podés adjuntar hasta ${MAX_ATTACHMENTS_PER_REPORT} archivos por reporte.`);
+      throw new BadRequestException(`You can attach up to ${MAX_ATTACHMENTS_PER_REPORT} files per report.`);
     }
     const maxMb = Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024));
     for (const attachment of attachments) {
       if (!isAllowedAttachmentMime(attachment.mimeType)) {
         throw new BadRequestException(
-          `Tipo de archivo no permitido (${attachment.fileName || attachment.mimeType}). Aceptamos: ${ALLOWED_ATTACHMENT_MIME.join(", ")}.`,
+          `File type not allowed (${attachment.fileName || attachment.mimeType}). Accepted types: ${ALLOWED_ATTACHMENT_MIME.join(", ")}.`,
         );
       }
       if (base64ByteLength(attachment.contentBase64) > MAX_ATTACHMENT_BYTES) {
-        throw new BadRequestException(`El archivo "${attachment.fileName}" supera el límite de ${maxMb}MB.`);
+        throw new BadRequestException(`File "${attachment.fileName}" exceeds the ${maxMb}MB limit.`);
       }
     }
   }
@@ -155,7 +155,7 @@ export class ReportsService {
       row.author_address.toLowerCase() === actor ||
       row.company_address.toLowerCase() === actor;
     if (!allowed) {
-      throw new ForbiddenException("No tenés permiso para ver este reporte");
+      throw new ForbiddenException("You don't have permission to view this report");
     }
   }
 

@@ -14,13 +14,15 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const text = await response.text();
+    let message = text;
     try {
       const parsed = JSON.parse(text) as { message?: string | string[] };
-      const message = Array.isArray(parsed.message) ? parsed.message.join(", ") : parsed.message;
-      throw new Error(message ?? text);
+      const raw = Array.isArray(parsed.message) ? parsed.message.join(", ") : parsed.message;
+      if (raw) message = raw;
     } catch {
-      throw new Error(text);
+      // not JSON, use raw text
     }
+    throw new Error(message);
   }
 
   return response.json() as Promise<T>;

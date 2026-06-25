@@ -73,7 +73,7 @@ export async function connectPreferredWallet(preferredAddress?: string) {
   if (preferredAddress) {
     const normalizedPreferred = preferredAddress.toLowerCase();
     if (activeAddress !== normalizedPreferred) {
-      throw new Error(`MetaMask sigue activa en ${activeAddress}. Cambiá la cuenta activa en MetaMask y volvé a intentar.`);
+      throw new Error(`MetaMask is still active on ${activeAddress}. Switch the active account in MetaMask and try again.`);
     }
     return normalizedPreferred;
   }
@@ -182,7 +182,7 @@ export async function waitForTransactionReceipt(
 
     if (receipt && receipt.blockNumber) {
       if (receipt.status && BigInt(receipt.status) === 0n) {
-        throw new Error("La transacción fue revertida on-chain.");
+        throw new Error("The transaction was reverted on-chain.");
       }
       return receipt;
     }
@@ -190,5 +190,5 @@ export async function waitForTransactionReceipt(
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 
-  throw new Error("La transacción no se confirmó a tiempo. Si MetaMask la confirmó, recargá la página.");
+  throw new Error("Transaction not confirmed in time. If MetaMask confirmed it, reload the page.");
 }

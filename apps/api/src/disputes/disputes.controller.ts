@@ -11,12 +11,17 @@ export class DisputesController {
   ) {}
 
   @Get()
-  list() {
+  async list(@Headers("authorization") authorization: string | undefined) {
+    await this.authService.requireRole(authorization, ["arbitrator", "admin"]);
     return this.disputesService.list();
   }
 
   @Get(":id")
-  getOne(@Param("id") id: string) {
+  async getOne(
+    @Headers("authorization") authorization: string | undefined,
+    @Param("id") id: string,
+  ) {
+    await this.authService.requireRole(authorization, ["arbitrator", "admin", "company", "hunter"]);
     return this.disputesService.getById(id);
   }
 

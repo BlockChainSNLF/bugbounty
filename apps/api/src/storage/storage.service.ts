@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { Injectable } from "@nestjs/common";
 
@@ -16,10 +16,11 @@ export class StorageService {
     return Promise.all(
       attachments.map(async (attachment) => {
         const buffer = Buffer.from(attachment.contentBase64, "base64");
-        const storagePath = join(reportDir, attachment.fileName);
+        const safeName = basename(attachment.fileName).replace(/[^a-zA-Z0-9._-]/g, "_") || "file";
+        const storagePath = join(reportDir, safeName);
         await writeFile(storagePath, buffer);
         return {
-          fileName: attachment.fileName,
+          fileName: safeName,
           mimeType: attachment.mimeType,
           sha256: sha256Hex(buffer),
           storagePath,

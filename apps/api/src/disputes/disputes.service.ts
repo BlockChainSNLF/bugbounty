@@ -66,11 +66,15 @@ export class DisputesService {
       "select av.arbitrator_address, u.alias as arbitrator_alias, av.vote_result, av.created_at from arbitrator_votes av left join users u on u.address = av.arbitrator_address where av.dispute_id = $1 order by av.created_at asc",
       [id],
     );
-    const enriched = await this.enrichDispute(dispute.rows[0]);
-    return { ...enriched, votes: votes.rows };
+    const assignedArbitrators = await this.getAssignedArbitrators(dispute.rows[0].dispute_id_on_chain);
+    return { ...dispute.rows[0], assignedArbitrators, votes: votes.rows };
   }
 
   async buildVoteIntent(id: string, actorAddress: string, voteResult: number) {
+    const contract = process.env.DISPUTE_ADDRESS;
+    if (!contract) {
+      throw new NotFoundException("Dispute contract is not configured");
+    }
     const dispute = await this.getById(id);
     const assigned = Array.isArray(dispute.assignedArbitrators) ? dispute.assignedArbitrators as string[] : [];
     if (!assigned.includes(actorAddress.toLowerCase())) {
@@ -81,7 +85,7 @@ export class DisputesService {
       disputeId: id,
       actorAddress,
       nextAction: {
-        contract: process.env.DISPUTE_ADDRESS,
+        contract,
         method: "vote",
         args: [String(dispute.dispute_id_on_chain), voteResult],
       },
@@ -89,6 +93,10 @@ export class DisputesService {
   }
 
   async buildFinalizeIntent(id: string, actorAddress: string) {
+    const contract = process.env.DISPUTE_ADDRESS;
+    if (!contract) {
+      throw new NotFoundException("Dispute contract is not configured");
+    }
     const dispute = await this.getById(id);
     const assigned = Array.isArray(dispute.assignedArbitrators) ? dispute.assignedArbitrators as string[] : [];
     if (!assigned.includes(actorAddress.toLowerCase())) {
@@ -99,7 +107,7 @@ export class DisputesService {
       disputeId: id,
       actorAddress,
       nextAction: {
-        contract: process.env.DISPUTE_ADDRESS,
+        contract,
         method: "finalizeDispute",
         args: [String(dispute.dispute_id_on_chain)],
       },

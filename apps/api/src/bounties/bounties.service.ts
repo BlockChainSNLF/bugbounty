@@ -113,6 +113,7 @@ export class BountiesService {
       address: string;
       title: string;
       description: string;
+      out_of_scope: string;
       reward_wei: string;
       chain_id: number;
       company_address: string;

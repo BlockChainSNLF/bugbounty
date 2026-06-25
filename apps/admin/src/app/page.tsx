@@ -67,13 +67,13 @@ function AdminLogin({ onSession }: { onSession(session: Session): void }) {
         body: JSON.stringify({ address, signature }),
       });
       if (!verified.isAdmin) {
-        throw new Error("Esta cuenta no tiene permisos de administrador.");
+        throw new Error("This account doesn't have admin permissions.");
       }
       window.localStorage.setItem("bugbounty.admin.token", verified.token);
       window.localStorage.setItem("bugbounty.admin.address", verified.address);
       onSession({ address: verified.address, role: verified.role });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No pudimos iniciar sesión");
+      setError(caught instanceof Error ? caught.message : "Could not sign in");
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ function AdminLogin({ onSession }: { onSession(session: Session): void }) {
         <h1>Admin Console</h1>
         {accounts.length > 1 ? (
           <label>
-            <span>Wallet activa</span>
+            <span>Active wallet</span>
             <select value={selectedAddress} onChange={(event) => setSelectedAddress(event.target.value)}>
               {accounts.map((address) => (
                 <option key={address} value={address}>{address}</option>
@@ -95,9 +95,9 @@ function AdminLogin({ onSession }: { onSession(session: Session): void }) {
           </label>
         ) : null}
         {accounts.length > 1 ? (
-          <p className="muted">La consola firma con la cuenta activa de MetaMask. Si querés usar otra, cambiala en la extensión antes de entrar.</p>
+          <p className="muted">The console signs with the active MetaMask account. To use a different one, switch it in the extension before logging in.</p>
         ) : null}
-        <button disabled={loading} onClick={login}>{loading ? "Validando..." : "Entrar con wallet admin"}</button>
+        <button disabled={loading} onClick={login}>{loading ? "Validating…" : "Sign in with admin wallet"}</button>
         {error ? <p className="danger">{error}</p> : null}
       </div>
     </section>
@@ -107,23 +107,31 @@ function AdminLogin({ onSession }: { onSession(session: Session): void }) {
 function ApproveCompanyForm() {
   const [address, setAddress] = useState("");
   const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <form onSubmit={async (event) => {
       event.preventDefault();
-      const response = await api<{ address: string }>("/admin/companies/" + address + "/approve", { method: "POST" });
-      setResult(`Empresa aprobada: ${response.address}`);
+      try {
+        setError(null);
+        const response = await api<{ address: string }>("/admin/companies/" + address + "/approve", { method: "POST" });
+        setResult(`Company approved: ${response.address}`);
+        setAddress("");
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Could not approve company");
+      }
     }}>
       <div className="form-header">
         <span className="eyebrow">Company access</span>
-        <h2>Aprobar empresa</h2>
+        <h2>Approve company</h2>
       </div>
       <label>
         <span>Wallet</span>
         <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="0x..." />
       </label>
-      <button type="submit">Aprobar</button>
-      {result ? <p>{result}</p> : null}
+      <button type="submit">Approve</button>
+      {result ? <p style={{ color: "var(--success)" }}>{result}</p> : null}
+      {error ? <p className="danger">{error}</p> : null}
     </form>
   );
 }
@@ -141,7 +149,7 @@ function RegisterArbitratorForm({ onRegistered }: { onRegistered(): Promise<unkn
         setError(null);
         const sessionAddress = window.localStorage.getItem("bugbounty.admin.address");
         if (!sessionAddress) {
-          throw new Error("No hay sesión admin activa.");
+          throw new Error("No active admin session.");
         }
         const response = await api<{
           address: string;
@@ -166,20 +174,20 @@ function RegisterArbitratorForm({ onRegistered }: { onRegistered(): Promise<unkn
         setAddress("");
         await onRegistered();
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "No pudimos incorporar al árbitro");
+        setError(caught instanceof Error ? caught.message : "Could not add arbitrator");
       } finally {
         setSubmitting(false);
       }
     }}>
       <div className="form-header">
         <span className="eyebrow">Jury access</span>
-        <h2>Incorporar árbitro</h2>
+        <h2>Add arbitrator</h2>
       </div>
       <label>
         <span>Wallet</span>
         <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="0x..." />
       </label>
-      <button disabled={submitting} type="submit">{submitting ? "Incorporando..." : "Incorporar"}</button>
+      <button disabled={submitting} type="submit">{submitting ? "Adding…" : "Add"}</button>
       {error ? <p className="danger">{error}</p> : null}
     </form>
   );
@@ -192,16 +200,16 @@ function SyncPanel() {
     <div className="panel">
       <div className="form-header">
         <span className="eyebrow">Indexer</span>
-        <h2>Sincronizar</h2>
+        <h2>Sync</h2>
       </div>
       <button onClick={async () => {
         try {
           const response = await api<{ synced: boolean; bountyLogs?: number; disputeLogs?: number; reason?: string }>("/admin/sync", { method: "POST" });
-          setStatus(response.synced ? `${response.bountyLogs ?? 0} programas, ${response.disputeLogs ?? 0} disputas` : response.reason ?? "Configuración incompleta");
+          setStatus(response.synced ? `${response.bountyLogs ?? 0} bounties, ${response.disputeLogs ?? 0} disputes` : response.reason ?? "Configuration incomplete");
         } catch (caught) {
-          setStatus(caught instanceof Error ? caught.message : "No pudimos sincronizar");
+          setStatus(caught instanceof Error ? caught.message : "Could not sync");
         }
-      }}>Actualizar estado</button>
+      }}>Sync now</button>
       {status ? <p>{status}</p> : null}
     </div>
   );
@@ -231,6 +239,11 @@ function DataPanel({
       {children || (empty ? <p>{empty}</p> : null)}
     </div>
   );
+}
+
+function clearAdminSession() {
+  window.localStorage.removeItem("bugbounty.admin.token");
+  window.localStorage.removeItem("bugbounty.admin.address");
 }
 
 export default function AdminPage() {
@@ -268,8 +281,13 @@ export default function AdminPage() {
         }
       })
       .catch((caught) => {
-        if (mounted) {
-          setOverviewError(caught instanceof Error ? caught.message : "No pudimos cargar el estado");
+        if (!mounted) return;
+        const msg = caught instanceof Error ? caught.message : "";
+        if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+          clearAdminSession();
+          setSession(null);
+        } else {
+          setOverviewError(msg || "Could not load overview");
         }
       });
 
@@ -285,7 +303,7 @@ export default function AdminPage() {
       await api(`/admin/companies/${address}`, { method: "DELETE" });
       await loadOverview();
     } catch (caught) {
-      setOverviewError(caught instanceof Error ? caught.message : "No pudimos quitar a la empresa");
+      setOverviewError(caught instanceof Error ? caught.message : "Could not remove company");
     } finally {
       setPendingCompanyRemoval(null);
     }
@@ -297,7 +315,7 @@ export default function AdminPage() {
       setOverviewError(null);
       const sessionAddress = window.localStorage.getItem("bugbounty.admin.address");
       if (!sessionAddress) {
-        throw new Error("No hay sesión admin activa.");
+        throw new Error("No active admin session.");
       }
       const response = await api<{
         address: string;
@@ -314,11 +332,11 @@ export default function AdminPage() {
       try {
         await api("/admin/sync", { method: "POST" });
       } catch (caught) {
-        setOverviewError(caught instanceof Error ? `Árbitro quitado on-chain, pero la sincronización quedó pendiente: ${caught.message}` : "Árbitro quitado on-chain, pero la sincronización quedó pendiente");
+        setOverviewError(caught instanceof Error ? `Arbitrator removed on-chain, but sync is pending: ${caught.message}` : "Arbitrator removed on-chain, but sync is pending");
       }
       await loadOverview();
     } catch (caught) {
-      setOverviewError(caught instanceof Error ? caught.message : "No pudimos quitar al árbitro");
+      setOverviewError(caught instanceof Error ? caught.message : "Could not remove arbitrator");
     } finally {
       setPendingArbitratorRemoval(null);
     }
@@ -340,15 +358,14 @@ export default function AdminPage() {
           <button
             className="session-exit"
             onClick={() => {
-              window.localStorage.removeItem("bugbounty.admin.token");
-              window.localStorage.removeItem("bugbounty.admin.address");
+              clearAdminSession();
               setOverview(null);
               setOverviewError(null);
               setSession(null);
             }}
             type="button"
           >
-            Salir
+            Sign out
           </button>
         </div>
       </header>
@@ -359,16 +376,16 @@ export default function AdminPage() {
         <SyncPanel />
       </section>
       <section className="dashboard-grid">
-        <DataPanel title="Empresas" eyebrow="Companies">
+        <DataPanel title="Companies" eyebrow="Companies">
           <div className="list-grid">
             {overview?.companies.length ? overview.companies.map((company) => (
               <div className="list-row" key={company.address}>
                 <div>
                   <strong>{trimAddress(company.address)}</strong>
-                  <span>{company.company_approved ? "Aprobada" : "Pendiente"}</span>
+                  <span>{company.company_approved ? "Approved" : "Pending"}</span>
                 </div>
                 <div className="session-cluster">
-                  <time>{new Date(company.created_at).toLocaleDateString("es-AR")}</time>
+                  <time>{new Date(company.created_at).toLocaleDateString("en-US")}</time>
                   {company.company_approved ? (
                     <button
                       className="session-exit"
@@ -376,61 +393,61 @@ export default function AdminPage() {
                       onClick={() => void removeCompany(company.address)}
                       type="button"
                     >
-                      {pendingCompanyRemoval === company.address ? "Quitando..." : "Quitar"}
+                      {pendingCompanyRemoval === company.address ? "Removing…" : "Remove"}
                     </button>
                   ) : null}
                 </div>
               </div>
-            )) : <p>Sin empresas registradas.</p>}
+            )) : <p>No companies registered.</p>}
           </div>
         </DataPanel>
-        <DataPanel title="Árbitros" eyebrow="Jury">
+        <DataPanel title="Arbitrators" eyebrow="Jury">
           <div className="list-grid">
             {overview?.arbitrators.length ? overview.arbitrators.map((arbitrator) => (
               <div className="list-row" key={arbitrator.address}>
                 <div>
                   <strong>{trimAddress(arbitrator.address)}</strong>
-                  <span>Activo</span>
+                  <span>Active</span>
                 </div>
                 <div className="session-cluster">
-                  <time>{new Date(arbitrator.created_at).toLocaleDateString("es-AR")}</time>
+                  <time>{new Date(arbitrator.created_at).toLocaleDateString("en-US")}</time>
                   <button
                     className="secondary"
                     disabled={pendingArbitratorRemoval === arbitrator.address}
                     onClick={() => void removeArbitrator(arbitrator.address)}
                     type="button"
                   >
-                    {pendingArbitratorRemoval === arbitrator.address ? "Quitando..." : "Quitar"}
+                    {pendingArbitratorRemoval === arbitrator.address ? "Removing…" : "Remove"}
                   </button>
                 </div>
               </div>
-            )) : <p>Sin árbitros registrados.</p>}
+            )) : <p>No arbitrators registered.</p>}
           </div>
         </DataPanel>
-        <DataPanel title="Programas" eyebrow="Bounties">
+        <DataPanel title="Bounties" eyebrow="Bounties">
           <div className="list-grid">
             {overview?.bounties.length ? overview.bounties.map((bounty) => (
               <div className="list-row" key={bounty.address}>
                 <div>
                   <strong>{bounty.title}</strong>
-                  <span>{trimAddress(bounty.company_address)} · {bounty.report_count} reportes</span>
+                  <span>{trimAddress(bounty.company_address)} · {bounty.report_count} reports</span>
                 </div>
                 <span>{bounty.reward_wei} wei</span>
               </div>
-            )) : <p>Sin programas registrados.</p>}
+            )) : <p>No bounties registered.</p>}
           </div>
         </DataPanel>
-        <DataPanel title="Disputas recientes" eyebrow="Disputes">
+        <DataPanel title="Recent disputes" eyebrow="Disputes">
           <div className="list-grid">
             {overview?.disputes.length ? overview.disputes.map((dispute) => (
               <div className="list-row" key={dispute.id}>
                 <div>
-                  <strong>{dispute.bounty_title ?? "Programa sin nombre"}</strong>
-                  <span>{dispute.status} · {dispute.result ?? "Pendiente"} · {trimAddress(dispute.hunter_address)}</span>
+                  <strong>{dispute.bounty_title ?? "Unnamed bounty"}</strong>
+                  <span>{dispute.status} · {dispute.result ?? "Pending"} · {trimAddress(dispute.hunter_address)}</span>
                 </div>
-                <span>{dispute.votes_cast} votos</span>
+                <span>{dispute.votes_cast} votes</span>
               </div>
-            )) : <p>Sin disputas registradas.</p>}
+            )) : <p>No disputes registered.</p>}
           </div>
         </DataPanel>
       </section>

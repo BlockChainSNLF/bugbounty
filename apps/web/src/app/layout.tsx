@@ -9,12 +9,12 @@ import { WalletSessionSync } from "../components/wallet-session-sync";
 
 export const metadata = {
   title: "BugBounty Grid",
-  description: "Divulgación de vulnerabilidades con escrow on-chain y arbitraje verificable.",
+  description: "On-chain escrow vulnerability disclosure with verifiable arbitration.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="en">
       <body>
         <Providers>
           <ToastProvider>
