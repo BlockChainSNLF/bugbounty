@@ -14,6 +14,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const text = await response.text();
+    if (text.trimStart().startsWith("<")) {
+      throw new Error(`${response.status} — The backend service is unavailable. Please try again in a moment.`);
+    }
     let message = text;
     try {
       const parsed = JSON.parse(text) as { message?: string | string[] };
@@ -29,6 +32,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     return JSON.parse(text) as T;
   } catch {
+    const url = `${API_URL}${path}`;
+    console.error("[api] Non-JSON response:", url, "| status:", response.status, "| content-type:", response.headers.get("content-type"), "| body:", text.slice(0, 300));
+    if (text.trimStart().startsWith("<")) {
+      throw new Error("The backend service is starting up. Please wait a few seconds and try again.");
+    }
     throw new Error("Server returned an unexpected response. The service may be temporarily unavailable.");
   }
 }

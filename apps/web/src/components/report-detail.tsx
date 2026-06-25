@@ -51,12 +51,15 @@ export function ReportDetail({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"accept" | "reject" | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const router = useRouter();
   const toast = useToast();
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      setLoading(true);
+      setError(null);
       const stored = getStoredSession();
       setSession(stored ? { address: stored.address, role: stored.role } : null);
       if (!stored) {
@@ -78,7 +81,7 @@ export function ReportDetail({ id }: { id: string }) {
       window.removeEventListener(SESSION_EVENT, load);
       window.removeEventListener("storage", load);
     };
-  }, [id]);
+  }, [id, retryCount]);
 
   function goBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -138,7 +141,11 @@ export function ReportDetail({ id }: { id: string }) {
     return (
       <section className="grid">
         <button className="secondary" style={{ width: "auto", padding: "8px 14px", justifySelf: "start" }} onClick={goBack} type="button">← Back</button>
-        <div className="panel"><h2>Report</h2><p className="danger">{error}</p></div>
+        <div className="panel">
+          <h2>Report</h2>
+          <p className="danger">{error}</p>
+          <button style={{ marginTop: 12, width: "auto", padding: "8px 14px" }} onClick={() => setRetryCount((c) => c + 1)} type="button">Try again</button>
+        </div>
       </section>
     );
   }
