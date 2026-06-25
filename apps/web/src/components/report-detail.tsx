@@ -144,7 +144,7 @@ export function ReportDetail({ id }: { id: string }) {
         <div className="panel">
           <h2>Report</h2>
           <p className="danger">{error}</p>
-          <button style={{ marginTop: 12, width: "auto", padding: "8px 14px" }} onClick={() => setRetryCount((c) => c + 1)} type="button">Try again</button>
+          <button style={{ marginTop: 12, width: "auto", padding: "8px 14px" }} onClick={() => { setLoading(true); setError(null); setRetryCount((c) => c + 1); }} type="button">Try again</button>
         </div>
       </section>
     );
