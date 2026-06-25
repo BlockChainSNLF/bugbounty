@@ -64,7 +64,14 @@ async function bootstrap() {
     process.env.ADMIN_APP_URL ?? "http://localhost:3001",
   ];
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`CORS rejected origin: ${origin} (allowed: ${allowedOrigins.join(", ")})`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   });
   await app.listen(Number(process.env.API_PORT ?? 4000));
