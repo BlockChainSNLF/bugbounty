@@ -53,7 +53,7 @@ export function WalletSessionSync() {
     lastLoggedIn.current = normalized;
     void ensureWalletSession()
       .then((session) => {
-        if (session.role === "admin" || session.isAdmin) {
+        if (session.role === "admin") {
           const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL;
           if (adminUrl) {
             window.location.href = adminUrl;
