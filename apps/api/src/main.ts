@@ -64,18 +64,21 @@ async function bootstrap() {
     process.env.ADMIN_APP_URL ?? "http://localhost:3001",
   ];
   console.log("CORS allowed origins:", allowedOrigins);
-  app.enableCors({
-    origin: (origin: string | undefined, callback: (err: Error | null, origin?: string | boolean) => void) => {
-      if (!origin) {
-        callback(null, true);
-      } else if (allowedOrigins.includes(origin)) {
-        callback(null, origin);
-      } else {
-        console.warn(`CORS rejected origin: ${origin} (allowed: ${allowedOrigins.join(", ")})`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
+  app.use((req: { method: string; headers: Record<string, string> }, res: { setHeader(k: string, v: string): void; status(c: number): { end(): void } }, next: () => void) => {
+    const origin = req.headers["origin"];
+    if (!origin || allowedOrigins.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin ?? allowedOrigins[0]);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    } else {
+      console.warn(`CORS rejected origin: ${origin}`);
+    }
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+    next();
   });
   await app.listen(Number(process.env.API_PORT ?? 4000));
 }
