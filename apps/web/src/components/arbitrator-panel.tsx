@@ -69,7 +69,7 @@ export function ArbitratorPanel() {
         window.localStorage.removeItem("bugbounty.role");
         window.localStorage.removeItem("bugbounty.address");
         setSession(null);
-        setError(caught instanceof Error ? caught.message : "No pudimos cargar tus disputas");
+        setError(caught instanceof Error ? caught.message : "Could not load your disputes");
       } finally {
         setLoading(false);
       }

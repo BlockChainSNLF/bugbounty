@@ -28,10 +28,10 @@ export function walletErrorMessage(caught: unknown, fallback: string): string {
     text.includes("user denied") ||
     text.includes("rejected the request")
   ) {
-    return "Cancelaste la operación en la wallet.";
+    return "You cancelled the wallet operation.";
   }
   if (text.includes("insufficient funds")) {
-    return "La wallet no tiene fondos suficientes para cubrir la recompensa y el gas.";
+    return "Insufficient wallet funds to cover the reward and gas.";
   }
   // Para el resto, usamos solo la primera línea: viem mete los detalles crudos
   // (Request Arguments, data hex) en líneas siguientes.

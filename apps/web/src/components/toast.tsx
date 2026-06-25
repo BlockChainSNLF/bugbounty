@@ -65,11 +65,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <span className="toast-title">{toast.title}</span>
               {toast.hash ? (
                 <a className="toast-link" href={explorerTxUrl(toast.hash)} target="_blank" rel="noopener noreferrer">
-                  Ver en explorer · {shortHash(toast.hash)} ↗
+                  View on explorer · {shortHash(toast.hash)} ↗
                 </a>
               ) : null}
             </div>
-            <button type="button" className="toast-close" onClick={() => dismiss(toast.id)} aria-label="Cerrar">
+            <button type="button" className="toast-close" onClick={() => dismiss(toast.id)} aria-label="Close">
               ✕
             </button>
           </div>

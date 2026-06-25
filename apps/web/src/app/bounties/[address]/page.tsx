@@ -7,9 +7,9 @@ export default async function BountyPage({ params }: BountyPageProps) {
   return (
     <section className="grid">
       <div className="panel">
-        <h2>Programa</h2>
+        <h2>Bounty</h2>
         <p className="mono">{address}</p>
-        <p className="muted">Acá vas a poder consultar el detalle del programa, su alcance y el estado de los reportes asociados.</p>
+        <p className="muted">Here you can view the bounty details, scope, and the status of associated reports.</p>
       </div>
     </section>
   );

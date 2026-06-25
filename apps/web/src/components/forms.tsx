@@ -403,7 +403,7 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
         const session = await ensureWalletSession(["hunter", "admin"]);
         setSessionAddress(session.address.toLowerCase());
         if (selectedBounty && selectedBounty.company_address.toLowerCase() === session.address.toLowerCase()) {
-          throw new Error("No podés reportar en un bounty de tu propia wallet empresa.");
+          throw new Error("You can't report on your own company's bounty.");
         }
         const filesError = validateFiles(files);
         if (filesError) {
@@ -574,7 +574,7 @@ export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
   }
 
   if (loading) {
-    return <div className="empty">Cargando tus reportes…</div>;
+    return <div className="empty">Loading your reports…</div>;
   }
 
   return (

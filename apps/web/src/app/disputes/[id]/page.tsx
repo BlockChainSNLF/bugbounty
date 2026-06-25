@@ -7,9 +7,9 @@ export default async function DisputePage({ params }: DisputePageProps) {
   return (
     <section className="grid">
       <div className="panel">
-        <h2>Disputa</h2>
+        <h2>Dispute</h2>
         <p className="mono">{id}</p>
-        <p className="muted">Acá vas a poder ver los antecedentes del caso, la evidencia autorizada y la resolución final.</p>
+        <p className="muted">Here you can view the case background, authorized evidence, and the final resolution.</p>
       </div>
     </section>
   );

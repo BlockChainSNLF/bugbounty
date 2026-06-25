@@ -83,10 +83,10 @@ export function clearStoredSession() {
 function requireConnectedAddress() {
   const account = getAccount(wagmiConfig);
   if (!account.address) {
-    throw new Error("Conectá tu wallet para continuar.");
+    throw new Error("Connect your wallet to continue.");
   }
   if (account.chainId !== CHAIN_ID) {
-    throw new Error("Cambiá tu wallet a la red Sepolia para continuar.");
+    throw new Error("Switch to the Sepolia network to continue.");
   }
   return account.address.toLowerCase();
 }
@@ -143,7 +143,7 @@ export async function ensureWalletSession(expectedRoles?: string[]) {
   }
 
   if (expectedRoles && !expectedRoles.includes(session.role)) {
-    throw new Error("Esta cuenta no tiene permisos para esta acción.");
+    throw new Error("This account doesn't have permission for this action.");
   }
 
   return session;

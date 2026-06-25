@@ -30,12 +30,12 @@ type ReportDetailData = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pendiente",
-  OFFCHAIN_STORED: "Sin confirmar",
-  ACCEPTED: "Aceptado",
-  RESOLVED: "Resuelto",
-  REJECTED: "Rechazado",
-  DISPUTED: "En disputa",
+  PENDING: "Pending",
+  OFFCHAIN_STORED: "Unconfirmed",
+  ACCEPTED: "Accepted",
+  RESOLVED: "Resolved",
+  REJECTED: "Rejected",
+  DISPUTED: "In dispute",
 };
 
 const ROLE_HOME: Record<string, string> = {
@@ -60,14 +60,14 @@ export function ReportDetail({ id }: { id: string }) {
       const stored = getStoredSession();
       setSession(stored ? { address: stored.address, role: stored.role } : null);
       if (!stored) {
-        if (!cancelled) { setLoading(false); setError("Conectá tu wallet para ver la evidencia."); }
+        if (!cancelled) { setLoading(false); setError("Connect your wallet to view the evidence."); }
         return;
       }
       try {
         const response = await api<ReportDetailData>(`/reports/${id}`);
         if (!cancelled) { setReport(response); setError(null); setLoading(false); }
       } catch (caught) {
-        if (!cancelled) { setError(caught instanceof Error ? caught.message : "No pudimos cargar el reporte"); setLoading(false); }
+        if (!cancelled) { setError(caught instanceof Error ? caught.message : "Could not load the report"); setLoading(false); }
       }
     }
     void load();
@@ -95,7 +95,7 @@ export function ReportDetail({ id }: { id: string }) {
       const url = await apiBlobUrl(`/reports/${id}/files/${file.fileId}`);
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No pudimos abrir el archivo");
+      setError(caught instanceof Error ? caught.message : "Could not open the file");
     } finally {
       setOpeningId(null);
     }
@@ -117,28 +117,28 @@ export function ReportDetail({ id }: { id: string }) {
         args: intent.nextAction.args,
         account: walletSession.address as `0x${string}`,
       });
-      toast.showTx(action === "accept" ? "Aceptando reporte…" : "Rechazando reporte…", hash);
+      toast.showTx(action === "accept" ? "Accepting report…" : "Rejecting report…", hash);
       await waitForTransactionReceipt(hash);
       await api(`/bounties/${report.bounty_address}/sync`, { method: "POST" });
-      toast.showSuccess(action === "accept" ? "Reporte aceptado y recompensa liberada." : "Reporte rechazado.");
+      toast.showSuccess(action === "accept" ? "Report accepted and reward released." : "Report rejected.");
       const refreshed = await api<ReportDetailData>(`/reports/${id}`);
       setReport(refreshed);
     } catch (caught) {
-      setError(walletErrorMessage(caught, "No pudimos resolver el reporte"));
+      setError(walletErrorMessage(caught, "Could not resolve the report"));
     } finally {
       setPendingAction(null);
     }
   }
 
   if (loading) {
-    return <section className="grid"><div className="empty">Cargando reporte…</div></section>;
+    return <section className="grid"><div className="empty">Loading report…</div></section>;
   }
 
   if (error && !report) {
     return (
       <section className="grid">
-        <button className="secondary" style={{ width: "auto", padding: "8px 14px", justifySelf: "start" }} onClick={goBack} type="button">← Volver</button>
-        <div className="panel"><h2>Reporte</h2><p className="danger">{error}</p></div>
+        <button className="secondary" style={{ width: "auto", padding: "8px 14px", justifySelf: "start" }} onClick={goBack} type="button">← Back</button>
+        <div className="panel"><h2>Report</h2><p className="danger">{error}</p></div>
       </section>
     );
   }
@@ -154,12 +154,12 @@ export function ReportDetail({ id }: { id: string }) {
 
   return (
     <section className="grid">
-      <button className="secondary" style={{ width: "auto", padding: "8px 14px", justifySelf: "start" }} onClick={goBack} type="button">← Volver</button>
+      <button className="secondary" style={{ width: "auto", padding: "8px 14px", justifySelf: "start" }} onClick={goBack} type="button">← Back</button>
 
       <div className="panel">
         <div className="stack-row">
           <div>
-            <p className="eyebrow" style={{ margin: "0 0 8px" }}>Reporte</p>
+            <p className="eyebrow" style={{ margin: "0 0 8px" }}>Report</p>
             <h2>{report.title}</h2>
             <span style={{ display: "inline-flex", gap: 8, marginTop: 6 }}>
               hunter <AddressDisplay address={report.author_address} link={false} />
@@ -170,14 +170,14 @@ export function ReportDetail({ id }: { id: string }) {
         <p className="muted" style={{ marginTop: 14 }}>{report.description}</p>
         {report.poc ? (
           <div style={{ marginTop: 14 }}>
-            <strong style={{ font: "600 12px var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>Reproducción</strong>
+            <strong style={{ font: "600 12px var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>Reproduction steps</strong>
             <p className="muted" style={{ whiteSpace: "pre-wrap", marginTop: 6 }}>{report.poc}</p>
           </div>
         ) : null}
       </div>
 
       <div className="panel">
-        <h3>Evidencia adjunta</h3>
+        <h3>Attached evidence</h3>
         {error ? <p className="danger">{error}</p> : null}
         {report.files.length ? (
           <div className="grid" style={{ gap: 10, marginTop: 12 }}>
@@ -188,36 +188,36 @@ export function ReportDetail({ id }: { id: string }) {
                   <span className="mono" style={{ display: "block", fontSize: 11, color: "var(--muted)", marginTop: 4 }}>{file.mime_type}</span>
                 </div>
                 <button style={{ width: "auto", padding: "8px 14px" }} disabled={openingId === file.fileId} onClick={() => void openFile(file)} type="button">
-                  {openingId === file.fileId ? "Abriendo…" : "Ver"}
+                  {openingId === file.fileId ? "Opening…" : "View"}
                 </button>
               </div>
             ))}
           </div>
         ) : (
-          <p className="muted" style={{ marginTop: 12 }}>Este reporte no tiene archivos adjuntos.</p>
+          <p className="muted" style={{ marginTop: 12 }}>This report has no attached files.</p>
         )}
       </div>
 
       {isOwnerCompany ? (
         <div className="panel">
-          <h3>Resolución</h3>
+          <h3>Resolution</h3>
           {canResolve ? (
             <>
-              <p className="muted" style={{ margin: "8px 0 16px", fontSize: 14 }}>Revisaste la evidencia. Aceptá para liberar la recompensa al hunter, o rechazá (el hunter puede abrir una disputa).</p>
+              <p className="muted" style={{ margin: "8px 0 16px", fontSize: 14 }}>You have reviewed the evidence. Accept to release the reward to the hunter, or reject (the hunter may open a dispute).</p>
               <div className="row-actions">
                 <button disabled={pendingAction !== null} onClick={() => void resolve("accept")} type="button">
-                  {pendingAction === "accept" ? "Aceptando…" : "Aceptar y pagar"}
+                  {pendingAction === "accept" ? "Accepting…" : "Accept and pay"}
                 </button>
                 <button className="secondary" disabled={pendingAction !== null} onClick={() => void resolve("reject")} type="button">
-                  {pendingAction === "reject" ? "Rechazando…" : "Rechazar"}
+                  {pendingAction === "reject" ? "Rejecting…" : "Reject"}
                 </button>
               </div>
             </>
           ) : (
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               {report.status === "OFFCHAIN_STORED"
-                ? "El hunter todavía no confirmó este reporte on-chain."
-                : `Este reporte ya está ${(STATUS_LABEL[report.status] ?? report.status).toLowerCase()}.`}
+                ? "The hunter hasn't confirmed this report on-chain yet."
+                : `This report is already ${(STATUS_LABEL[report.status] ?? report.status).toLowerCase()}.`}
             </p>
           )}
         </div>
