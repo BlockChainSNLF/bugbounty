@@ -65,6 +65,7 @@ type BountyOption = {
   address: string;
   title: string;
   description: string;
+  out_of_scope?: string | null;
   reward_wei: string;
   company_address: string;
   company_alias?: string | null;
@@ -339,10 +340,16 @@ export function ProgramsList({ onReport }: { onReport(address: string): void }) 
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ font: "700 20px var(--font-display)", color: "var(--ink)" }}>{formatEther(BigInt(bounty.reward_wei))} ETH</div>
-              <div className="mono" style={{ fontSize: 10, color: "var(--success)" }}>recompensa</div>
+              <div className="mono" style={{ fontSize: 10, color: "var(--success)" }}>reward</div>
             </div>
           </div>
-          <p className="muted" style={{ margin: "14px 0 0", flex: 1, font: "400 13px/1.55 var(--font-body)" }}>{bounty.description}</p>
+          <p className="muted" style={{ margin: "14px 0 0", font: "400 13px/1.55 var(--font-body)" }}>{bounty.description}</p>
+          {bounty.out_of_scope ? (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--surface)", borderRadius: 6, font: "400 12px/1.5 var(--font-body)" }}>
+              <span style={{ fontWeight: 600, color: "var(--ink)" }}>Out of scope: </span>
+              <span className="muted">{bounty.out_of_scope}</span>
+            </div>
+          ) : null}
           <div className="stack-row" style={{ alignItems: "center", marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
             <AddressDisplay address={bounty.address} />
             <button style={{ width: "auto", padding: "10px 16px" }} onClick={() => onReport(bounty.address)} type="button">Report finding</button>

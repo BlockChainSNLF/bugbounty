@@ -119,7 +119,7 @@ export class BountiesService {
       company_alias: string | null;
       created_at: string;
     }>(
-      `select b.address, b.title, b.description, b.reward_wei, b.chain_id, b.company_address,
+      `select b.address, b.title, b.description, b.out_of_scope, b.reward_wei, b.chain_id, b.company_address,
               cu.alias as company_alias, b.created_at
        from bounties b
        left join users cu on cu.address = b.company_address
