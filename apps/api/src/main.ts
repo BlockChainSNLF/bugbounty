@@ -65,9 +65,11 @@ async function bootstrap() {
   ];
   console.log("CORS allowed origins:", allowedOrigins);
   app.enableCors({
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+    origin: (origin: string | undefined, callback: (err: Error | null, origin?: string | boolean) => void) => {
+      if (!origin) {
         callback(null, true);
+      } else if (allowedOrigins.includes(origin)) {
+        callback(null, origin);
       } else {
         console.warn(`CORS rejected origin: ${origin} (allowed: ${allowedOrigins.join(", ")})`);
         callback(new Error("Not allowed by CORS"));
