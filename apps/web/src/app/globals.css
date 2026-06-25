@@ -274,6 +274,7 @@ h3 {
   right: 0;
   z-index: 60;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   width: 266px;
   padding: 9px;
@@ -287,14 +288,22 @@ h3 {
   align-items: center;
   gap: 11px;
   padding: 9px 9px 4px;
+  min-width: 0;
+}
+.account-menu-head > div {
+  min-width: 0;
 }
 .account-menu-head .account-avatar {
+  flex: none;
   width: 38px;
   height: 38px;
   border-radius: 11px;
   font-size: 12px;
 }
 .account-menu-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font: 600 14px var(--font-body);
   color: var(--ink);
 }
@@ -308,6 +317,7 @@ h3 {
 }
 .account-addr {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 7px 9px;
@@ -315,7 +325,7 @@ h3 {
   background: rgba(255, 255, 255, 0.03);
 }
 .account-addr .mono {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -360,6 +370,7 @@ h3 {
 }
 
 .account-add-btn {
+  flex: none;
   width: 28px;
   height: 28px;
   margin-left: auto;
