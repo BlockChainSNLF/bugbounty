@@ -19,10 +19,6 @@ export function CompanyWorkspace() {
   useEffect(() => {
     let cancelled = false;
 
-    // Re-deriva la sesión cada vez que cambia (login, switch de cuenta, otra
-    // pestaña). Sin esto la vista quedaba con la sesión leída al montar y, si
-    // perdía la carrera contra WalletSessionSync, mostraba el estado vacío para
-    // siempre. Mismo patrón de escucha que RoleLinks (header).
     async function load() {
       try {
         setError(null);
@@ -34,7 +30,6 @@ export function CompanyWorkspace() {
           }
           return;
         }
-        // Pinta el workspace al instante con el rol cacheado y revalida con /me.
         if (!cancelled) {
           setSession({ address: stored.address, role: stored.role });
           setLoading(false);
@@ -46,7 +41,7 @@ export function CompanyWorkspace() {
       } catch (caught) {
         if (!cancelled) {
           setSession(null);
-          setError(caught instanceof Error ? caught.message : "No pudimos cargar tu sesión de empresa");
+          setError(caught instanceof Error ? caught.message : "Could not load your company session");
           setLoading(false);
         }
       }
@@ -63,18 +58,18 @@ export function CompanyWorkspace() {
   }, []);
 
   if (loading) {
-    return <section className="workspace-layout"><div className="empty">Cargando workspace de empresa…</div></section>;
+    return <section className="workspace-layout"><div className="empty">Loading company workspace…</div></section>;
   }
 
   if (!session || !["company", "admin"].includes(session.role)) {
     return (
       <section className="workspace-layout">
         <div className="page-heading">
-          <div><p className="eyebrow">Company workspace</p><h1>Programas y recompensas</h1></div>
+          <div><p className="eyebrow">Company workspace</p><h1>Bounties and rewards</h1></div>
         </div>
         <div className="empty">
-          <h3>Workspace de empresa</h3>
-          <p>{!session ? "Conectá una cuenta de empresa aprobada para crear y gestionar programas." : "Esta cuenta no tiene permisos de empresa."}</p>
+          <h3>Company workspace</h3>
+          <p>{!session ? "Connect an approved company account to create and manage bounties." : "This account doesn't have company permissions."}</p>
           {error ? <p className="danger">{error}</p> : null}
         </div>
       </section>
@@ -86,11 +81,11 @@ export function CompanyWorkspace() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Company workspace</p>
-          <h1>Programas y recompensas</h1>
+          <h1>Bounties and rewards</h1>
         </div>
         <nav className="tabs">
-          <button type="button" className={`tab${tab === "programs" ? " tab-active" : ""}`} onClick={() => setTab("programs")}>Mis programas</button>
-          <button type="button" className={`tab${tab === "create" ? " tab-active" : ""}`} onClick={() => setTab("create")}>Crear programa</button>
+          <button type="button" className={`tab${tab === "programs" ? " tab-active" : ""}`} onClick={() => setTab("programs")}>My bounties</button>
+          <button type="button" className={`tab${tab === "create" ? " tab-active" : ""}`} onClick={() => setTab("create")}>Create bounty</button>
         </nav>
       </div>
 
@@ -102,12 +97,12 @@ export function CompanyWorkspace() {
             <RegisterBountyForm onCreated={async () => { setRefreshKey((current) => current + 1); setTab("programs"); }} />
           </div>
           <div className="panel" style={{ alignSelf: "start" }}>
-            <p className="eyebrow" style={{ margin: "0 0 18px" }}>Qué pasa al publicar</p>
+            <p className="eyebrow" style={{ margin: "0 0 18px" }}>What happens when you publish</p>
             <div style={{ display: "grid", gap: 16 }}>
               {[
-                "Se despliega un contrato con la recompensa bloqueada.",
-                "Los hunters ven el programa y envían reportes.",
-                "Aceptás para pagar automáticamente o rechazás (puede ir a disputa).",
+                "A contract is deployed with the reward locked in escrow.",
+                "Hunters can see the bounty and submit reports.",
+                "Accept to pay automatically or reject (which can be disputed).",
               ].map((text, i) => (
                 <div key={i} style={{ display: "flex", gap: 14 }}>
                   <span style={{ font: "700 13px var(--font-mono)", color: "var(--accent)", minWidth: 22, flexShrink: 0 }}>0{i + 1}</span>

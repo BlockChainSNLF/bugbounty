@@ -18,12 +18,12 @@ import { AddressDisplay } from "./address-display";
 import { useToast } from "./toast";
 
 const SEVERITY_LABEL: Record<string, { label: string; cls: string }> = {
-  PENDING: { label: "Pendiente", cls: "pill-warn" },
-  OFFCHAIN_STORED: { label: "Sin confirmar", cls: "pill-warn" },
-  ACCEPTED: { label: "Aceptado", cls: "pill-success" },
-  RESOLVED: { label: "Resuelto", cls: "pill-info" },
-  REJECTED: { label: "Rechazado", cls: "pill-warn" },
-  DISPUTED: { label: "En disputa", cls: "pill-info" },
+  PENDING: { label: "Pending", cls: "pill-warn" },
+  OFFCHAIN_STORED: { label: "Unconfirmed", cls: "pill-warn" },
+  ACCEPTED: { label: "Accepted", cls: "pill-success" },
+  RESOLVED: { label: "Resolved", cls: "pill-info" },
+  REJECTED: { label: "Rejected", cls: "pill-warn" },
+  DISPUTED: { label: "In dispute", cls: "pill-info" },
 };
 
 function StatusPill({ status }: { status: string }) {
@@ -36,7 +36,7 @@ const ATTACHMENT_ACCEPT = ".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt";
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`No pudimos leer "${file.name}"`));
+    reader.onerror = () => reject(new Error(`Could not read "${file.name}"`));
     reader.onload = () => {
       const result = reader.result as string;
       resolve(result.slice(result.indexOf(",") + 1));
@@ -47,15 +47,15 @@ function readFileAsBase64(file: File): Promise<string> {
 
 function validateFiles(files: File[]): string | null {
   if (files.length > MAX_ATTACHMENTS_PER_REPORT) {
-    return `Podés adjuntar hasta ${MAX_ATTACHMENTS_PER_REPORT} archivos.`;
+    return `You can attach up to ${MAX_ATTACHMENTS_PER_REPORT} files.`;
   }
   const maxMb = Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024));
   for (const file of files) {
     if (file.type && !isAllowedAttachmentMime(file.type)) {
-      return `Tipo no permitido (${file.name}). Aceptamos PDF, imágenes y texto.`;
+      return `File type not allowed (${file.name}). We accept PDFs, images, and text.`;
     }
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      return `"${file.name}" supera el límite de ${maxMb}MB.`;
+      return `"${file.name}" exceeds the ${maxMb}MB limit per file.`;
     }
   }
   return null;
@@ -94,10 +94,10 @@ export function RegisterBountyForm({ onCreated }: { onCreated(): Promise<unknown
           account: companyAddress as `0x${string}`,
           value: rewardWei,
         });
-        toast.showTx("Desplegando programa…", deployHash);
+        toast.showTx("Deploying bounty…", deployHash);
         const receipt = await waitForTransactionReceipt(deployHash);
         if (!receipt.contractAddress) {
-          throw new Error("No pudimos obtener la dirección del programa desplegado");
+          throw new Error("Could not get the deployed bounty address");
         }
 
         await api<{ address: string }>("/bounties", {
@@ -111,33 +111,33 @@ export function RegisterBountyForm({ onCreated }: { onCreated(): Promise<unknown
             chainId: deploySpec.chainId,
           }),
         });
-        toast.showSuccess("Programa creado y recompensa bloqueada en escrow.");
+        toast.showSuccess("Bounty created and reward locked in escrow.");
         setPayload({ title: "", description: "", outOfScope: "", rewardEth: "1.0" });
         await onCreated();
       } catch (caught) {
-        setError(walletErrorMessage(caught, "No pudimos crear el programa"));
+        setError(walletErrorMessage(caught, "Could not create the bounty"));
       } finally {
         setSubmitting(false);
       }
     }}>
-      <p className="eyebrow" style={{ margin: "0 0 18px" }}>Nuevo programa de bounty</p>
+      <p className="eyebrow" style={{ margin: "0 0 18px" }}>New bounty</p>
       <label>
-        <span>Nombre del programa</span>
-        <input value={payload.title} onChange={(event) => setPayload({ ...payload, title: event.target.value })} placeholder="Portal de clientes" />
+        <span>Bounty name</span>
+        <input value={payload.title} onChange={(event) => setPayload({ ...payload, title: event.target.value })} placeholder="Customer portal" />
       </label>
       <label>
-        <span>En alcance</span>
-        <textarea value={payload.description} onChange={(event) => setPayload({ ...payload, description: event.target.value })} placeholder="Dominios, contratos y sistemas que aceptás que se testeen" />
+        <span>In scope</span>
+        <textarea value={payload.description} onChange={(event) => setPayload({ ...payload, description: event.target.value })} placeholder="Domains, contracts, and systems you accept for testing" />
       </label>
       <label>
-        <span>Fuera de alcance <span className="muted" style={{ fontWeight: 400 }}>· qué no aceptás</span></span>
-        <textarea value={payload.outOfScope} onChange={(event) => setPayload({ ...payload, outOfScope: event.target.value })} placeholder="Phishing, DoS, hallazgos de scanners sin PoC, entornos de staging…" />
+        <span>Out of scope <span className="muted" style={{ fontWeight: 400 }}>· what you don't accept</span></span>
+        <textarea value={payload.outOfScope} onChange={(event) => setPayload({ ...payload, outOfScope: event.target.value })} placeholder="Phishing, DoS, scanner findings without PoC, staging environments…" />
       </label>
       <label>
-        <span>Recompensa en ETH <span className="muted" style={{ fontWeight: 400 }}>(se bloquea en escrow)</span></span>
+        <span>Reward in ETH <span className="muted" style={{ fontWeight: 400 }}>(locked in escrow)</span></span>
         <input value={payload.rewardEth} onChange={(event) => setPayload({ ...payload, rewardEth: event.target.value })} placeholder="1.0" />
       </label>
-      <button disabled={submitting} type="submit">{submitting ? "Desplegando…" : "Desplegar escrow y publicar"}</button>
+      <button disabled={submitting} type="submit">{submitting ? "Deploying…" : "Publish bounty"}</button>
       {error ? <p className="danger">{error}</p> : null}
     </form>
   );
@@ -184,7 +184,7 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
     let mounted = true;
     void loadBounties()
       .then((response) => { if (mounted) { setBounties(response); setLoading(false); } })
-      .catch((caught) => { if (mounted) { setError(caught instanceof Error ? caught.message : "No pudimos cargar tus programas"); setLoading(false); } });
+      .catch((caught) => { if (mounted) { setError(caught instanceof Error ? caught.message : "Could not load your bounties"); setLoading(false); } });
     return () => { mounted = false; };
   }, [refreshKey]);
 
@@ -200,20 +200,20 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
         args: intent.nextAction.args,
         account: session.address as `0x${string}`,
       });
-      toast.showTx(action === "accept" ? "Aceptando reporte…" : "Rechazando reporte…", hash);
+      toast.showTx(action === "accept" ? "Accepting report…" : "Rejecting report…", hash);
       await waitForTransactionReceipt(hash);
       await api(`/bounties/${bountyAddress}/sync`, { method: "POST" });
-      toast.showSuccess(action === "accept" ? "Reporte aceptado y recompensa liberada." : "Reporte rechazado.");
+      toast.showSuccess(action === "accept" ? "Report accepted and reward released." : "Report rejected.");
       await loadBounties();
     } catch (caught) {
-      setError(walletErrorMessage(caught, "No pudimos resolver el reporte"));
+      setError(walletErrorMessage(caught, "Could not resolve the report"));
     } finally {
       setPendingAction(null);
     }
   }
 
   if (loading) {
-    return <div className="empty">Cargando tus programas…</div>;
+    return <div className="empty">Loading your bounties…</div>;
   }
   if (error) {
     return <div className="panel"><p className="danger">{error}</p></div>;
@@ -221,8 +221,8 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
   if (!bounties.length) {
     return (
       <div className="empty">
-        <h3>Todavía no tenés programas</h3>
-        <p>Cuando despliegues un bounty, va a aparecer acá con sus reportes y estados.</p>
+        <h3>No bounties yet</h3>
+        <p>Once you deploy a bounty, it will appear here with its reports and status.</p>
       </div>
     );
   }
@@ -241,59 +241,57 @@ export function CompanyBountiesPanel({ refreshKey }: { refreshKey: number }) {
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ font: "700 20px var(--font-display)", color: "var(--ink)" }}>{formatEther(BigInt(bounty.reward_wei))} ETH</div>
-                <div className="mono" style={{ fontSize: 10, color: "var(--success)" }}>recompensa</div>
+                <div className="mono" style={{ fontSize: 10, color: "var(--success)" }}>reward</div>
               </div>
             </div>
 
             <div className="dispute-meta" style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-              <div><strong>Contrato</strong><AddressDisplay address={bounty.address} /></div>
-              <div><strong>Activos</strong><p className="muted" style={{ margin: 0 }}>{activeReports.length} reportes</p></div>
-              <div><strong>Resueltos</strong><p className="muted" style={{ margin: 0 }}>{resolvedReports.length} reportes</p></div>
+              <div><strong>Contract</strong><AddressDisplay address={bounty.address} /></div>
+              <div><strong>Active</strong><p className="muted" style={{ margin: 0 }}>{activeReports.length} reports</p></div>
+              <div><strong>Resolved</strong><p className="muted" style={{ margin: 0 }}>{resolvedReports.length} reports</p></div>
             </div>
 
             <div className="grid" style={{ marginTop: 16, gap: 10 }}>
-              <strong style={{ font: "600 12px var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>Reportes activos</strong>
+              <strong style={{ font: "600 12px var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>Active reports</strong>
               {activeReports.length ? activeReports.map((report) => (
                 <div className="list-row" key={report.id}>
                   <div>
-                    <strong>{report.title}</strong>
+                    <a href={`/reports/${report.id}`} style={{ color: "var(--ink)", textDecoration: "none", fontWeight: 600 }}>{report.title}</a>
                     <span style={{ display: "inline-flex", gap: 8, marginTop: 4 }}>
                       hunter <AddressDisplay address={report.author_address} alias={report.author_alias} link={false} />
                     </span>
                   </div>
                   <div className="row-actions">
                     <StatusPill status={report.status} />
-                    <a className="tx-link" href={`/reports/${report.id}`}>Ver evidencia</a>
                     {report.tx_hash ? <a className="tx-link" href={explorerTxUrl(report.tx_hash)} target="_blank" rel="noopener noreferrer">{shortHash(report.tx_hash)} ↗</a> : null}
                     {report.status === "PENDING" ? (
                       <>
                         <button disabled={pendingAction === `${report.id}:accept`} onClick={() => void resolveReport(report.id, "accept", bounty.address as `0x${string}`)} type="button">
-                          {pendingAction === `${report.id}:accept` ? "Aceptando…" : "Aceptar"}
+                          {pendingAction === `${report.id}:accept` ? "Accepting…" : "Accept"}
                         </button>
                         <button className="secondary" disabled={pendingAction === `${report.id}:reject`} onClick={() => void resolveReport(report.id, "reject", bounty.address as `0x${string}`)} type="button">
-                          {pendingAction === `${report.id}:reject` ? "Rechazando…" : "Rechazar"}
+                          {pendingAction === `${report.id}:reject` ? "Rejecting…" : "Reject"}
                         </button>
                       </>
                     ) : null}
                   </div>
                 </div>
-              )) : <p className="muted">Sin reportes activos.</p>}
+              )) : <p className="muted">No active reports.</p>}
             </div>
 
             {resolvedReports.length ? (
               <div className="grid" style={{ marginTop: 16, gap: 10 }}>
-                <strong style={{ font: "600 12px var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>Resueltos</strong>
+                <strong style={{ font: "600 12px var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>Resolved</strong>
                 {resolvedReports.map((report) => (
                   <div className="list-row" key={report.id}>
                     <div>
-                      <strong>{report.title}</strong>
+                      <a href={`/reports/${report.id}`} style={{ color: "var(--ink)", textDecoration: "none", fontWeight: 600 }}>{report.title}</a>
                       <span style={{ display: "inline-flex", gap: 8, marginTop: 4 }}>
                         hunter <AddressDisplay address={report.author_address} alias={report.author_alias} link={false} />
-                        {report.dispute_id ? ` · disputa ${report.dispute_result ?? report.dispute_status ?? "abierta"}` : ""}
+                        {report.dispute_id ? ` · dispute ${report.dispute_result ?? report.dispute_status ?? "open"}` : ""}
                       </span>
                     </div>
                     <div className="row-actions">
-                      <a className="tx-link" href={`/reports/${report.id}`}>Ver evidencia</a>
                       <StatusPill status={report.status} />
                     </div>
                   </div>
@@ -316,18 +314,18 @@ export function ProgramsList({ onReport }: { onReport(address: string): void }) 
     let mounted = true;
     void api<BountyOption[]>("/bounties")
       .then((response) => { if (mounted) { setBounties(response); setLoading(false); } })
-      .catch((caught) => { if (mounted) { setError(caught instanceof Error ? caught.message : "No pudimos cargar los programas"); setLoading(false); } });
+      .catch((caught) => { if (mounted) { setError(caught instanceof Error ? caught.message : "Could not load bounties"); setLoading(false); } });
     return () => { mounted = false; };
   }, []);
 
   if (loading) {
-    return <div className="empty">Cargando programas abiertos…</div>;
+    return <div className="empty">Loading open bounties…</div>;
   }
   if (error) {
     return <div className="panel"><p className="danger">{error}</p></div>;
   }
   if (!bounties.length) {
-    return <div className="empty"><h3>No hay programas abiertos</h3><p>Cuando una empresa publique un programa, va a aparecer acá.</p></div>;
+    return <div className="empty"><h3>No open bounties</h3><p>When a company publishes a bounty, it will appear here.</p></div>;
   }
 
   return (
@@ -347,7 +345,7 @@ export function ProgramsList({ onReport }: { onReport(address: string): void }) 
           <p className="muted" style={{ margin: "14px 0 0", flex: 1, font: "400 13px/1.55 var(--font-body)" }}>{bounty.description}</p>
           <div className="stack-row" style={{ alignItems: "center", marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
             <AddressDisplay address={bounty.address} />
-            <button style={{ width: "auto", padding: "10px 16px" }} onClick={() => onReport(bounty.address)} type="button">Reportar hallazgo</button>
+            <button style={{ width: "auto", padding: "10px 16px" }} onClick={() => onReport(bounty.address)} type="button">Report finding</button>
           </div>
         </article>
       ))}
@@ -428,35 +426,35 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
           args: [response.reportHash],
           account: session.address as `0x${string}`,
         });
-        toast.showTx("Registrando reporte on-chain…", hash);
+        toast.showTx("Registering report on-chain…", hash);
         await waitForTransactionReceipt(hash);
         try {
           await api(`/bounties/${payload.bountyAddress}/sync`, { method: "POST" });
         } catch (caught) {
-          throw new Error(`El reporte quedó confirmado on-chain, pero falló la sincronización: ${caught instanceof Error ? caught.message : "error desconocido"}`);
+          throw new Error(`Report confirmed on-chain, but sync failed: ${caught instanceof Error ? caught.message : "unknown error"}`);
         }
-        toast.showSuccess("Reporte enviado y confirmado on-chain.");
+        toast.showSuccess("Report submitted and confirmed on-chain.");
         setPayload({ bountyAddress: "", title: "", description: "", poc: "" });
         setFiles([]);
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
         onSubmitted();
-        setResult(`Reporte confirmado. Código de seguimiento: ${shortHash(response.reportHash)}`);
+        setResult(`Report confirmed. Tracking code: ${shortHash(response.reportHash)}`);
       } catch (caught) {
-        setError(walletErrorMessage(caught, "No pudimos enviar el reporte"));
+        setError(walletErrorMessage(caught, "Could not submit the report"));
       } finally {
         setSubmitting(false);
       }
     }}>
       <div className="form-header">
-        <span className="surface-kicker">Nuevo reporte</span>
-        <h3>Reportá un hallazgo</h3>
+        <span className="surface-kicker">New report</span>
+        <h3>Report a finding</h3>
       </div>
       <label>
-        <span>Programa</span>
+        <span>Bounty</span>
         <select value={payload.bountyAddress} onChange={(event) => setPayload({ ...payload, bountyAddress: event.target.value })}>
-          <option value="">{loadingBounties ? "Cargando programas…" : "Elegí un programa abierto"}</option>
+          <option value="">{loadingBounties ? "Loading bounties…" : "Choose an open bounty"}</option>
           {bounties.map((bounty) => (
             <option key={bounty.address} value={bounty.address}>
               {bounty.title} · {formatEther(BigInt(bounty.reward_wei))} ETH{bounty.company_alias ? ` · ${bounty.company_alias}` : ""}
@@ -465,23 +463,23 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
         </select>
       </label>
       {selectedBounty ? (
-        <div className="badge"><span>Contrato</span><AddressDisplay address={selectedBounty.address} /></div>
+        <div className="badge"><span>Contract</span><AddressDisplay address={selectedBounty.address} /></div>
       ) : null}
-      {isOwnBounty ? <p className="danger">Ese bounty pertenece a tu wallet. El contrato bloquea el auto-reporte.</p> : null}
+      {isOwnBounty ? <p className="danger">This bounty belongs to your wallet. The contract blocks self-reporting.</p> : null}
       <label>
-        <span>Título</span>
-        <input value={payload.title} onChange={(event) => setPayload({ ...payload, title: event.target.value })} placeholder="Acceso indebido a información sensible" />
+        <span>Title</span>
+        <input value={payload.title} onChange={(event) => setPayload({ ...payload, title: event.target.value })} placeholder="Unauthorized access to sensitive data" />
       </label>
       <label>
-        <span>Impacto</span>
-        <textarea value={payload.description} onChange={(event) => setPayload({ ...payload, description: event.target.value })} placeholder="Qué pasa y por qué importa" />
+        <span>Impact</span>
+        <textarea value={payload.description} onChange={(event) => setPayload({ ...payload, description: event.target.value })} placeholder="What happens and why it matters" />
       </label>
       <label>
-        <span>Reproducción</span>
-        <textarea value={payload.poc} onChange={(event) => setPayload({ ...payload, poc: event.target.value })} placeholder="Pasos para reproducir el hallazgo" />
+        <span>Reproduction steps</span>
+        <textarea value={payload.poc} onChange={(event) => setPayload({ ...payload, poc: event.target.value })} placeholder="Steps to reproduce the finding" />
       </label>
       <label>
-        <span>Evidencia <span className="muted" style={{ fontWeight: 400 }}>· PDF, imágenes o texto · hasta {Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB c/u</span></span>
+        <span>Evidence <span className="muted" style={{ fontWeight: 400 }}>· PDF, images or text · up to {Math.round(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB each</span></span>
         <input
           ref={fileInputRef}
           type="file"
@@ -504,8 +502,8 @@ export function CreateReportForm({ onSubmitted, initialBounty }: { onSubmitted()
           ))}
         </div>
       ) : null}
-      <button disabled={submitting || isOwnBounty || !payload.bountyAddress} type="submit">{submitting ? "Enviando reporte…" : "Guardar y confirmar on-chain"}</button>
-      <p className="muted" style={{ margin: 0, fontSize: 12 }}>La evidencia se guarda privada off-chain y su hash queda registrado on-chain como prueba de autoría.</p>
+      <button disabled={submitting || isOwnBounty || !payload.bountyAddress} type="submit">{submitting ? "Submitting…" : "Submit and confirm on-chain"}</button>
+      <p className="muted" style={{ margin: 0, fontSize: 12 }}>Evidence is stored privately off-chain; its hash is registered on-chain as proof of authorship.</p>
       {result ? <p style={{ color: "var(--success)" }}>{result}</p> : null}
       {error ? <p className="danger">{error}</p> : null}
     </form>
@@ -548,7 +546,7 @@ export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
     let mounted = true;
     void loadReports()
       .then((response) => { if (mounted) { setReports(response); setLoading(false); } })
-      .catch((caught) => { if (mounted) { setError(caught instanceof Error ? caught.message : "No pudimos cargar tus reportes"); setLoading(false); } });
+      .catch((caught) => { if (mounted) { setError(caught instanceof Error ? caught.message : "Could not load your reports"); setLoading(false); } });
     return () => { mounted = false; };
   }, [refreshKey]);
 
@@ -584,33 +582,33 @@ export function HunterReportsPanel({ refreshKey }: { refreshKey: number }) {
             </div>
             <span style={{ display: "inline-flex", gap: 6, marginTop: 4, alignItems: "center" }}>
               {report.bounty_title} · <AddressDisplay address={report.company_address ?? report.bounty_address} alias={report.company_alias} link={false} />
-              {report.dispute_id ? ` · disputa ${report.dispute_result ?? report.dispute_status ?? "abierta"}` : ""}
+              {report.dispute_id ? ` · dispute ${report.dispute_result ?? report.dispute_status ?? "open"}` : ""}
             </span>
           </div>
           <div className="row-actions">
-            <a className="tx-link" href={`/reports/${report.id}`}>Ver evidencia</a>
+            <a className="tx-link" href={`/reports/${report.id}`}>View evidence</a>
             {report.tx_hash ? <a className="tx-link" href={explorerTxUrl(report.tx_hash)} target="_blank" rel="noopener noreferrer">{shortHash(report.tx_hash)} ↗</a> : null}
             {report.status === "OFFCHAIN_STORED" ? (
               <button disabled={pendingResubmit === report.id} onClick={async () => {
-                try { setPendingResubmit(report.id); setError(null); await runIntent(report.id, report.bounty_address as `0x${string}`, "resubmit", "Confirmando on-chain…"); }
-                catch (caught) { setError(walletErrorMessage(caught, "No pudimos confirmar el reporte")); }
+                try { setPendingResubmit(report.id); setError(null); await runIntent(report.id, report.bounty_address as `0x${string}`, "resubmit", "Confirming on-chain…"); }
+                catch (caught) { setError(walletErrorMessage(caught, "Could not confirm the report")); }
                 finally { setPendingResubmit(null); }
               }} type="button">
-                {pendingResubmit === report.id ? "Confirmando…" : "Confirmar on-chain"}
+                {pendingResubmit === report.id ? "Confirming…" : "Confirm on-chain"}
               </button>
             ) : null}
             {report.status === "REJECTED" ? (
               <button disabled={pendingDispute === report.id} onClick={async () => {
-                try { setPendingDispute(report.id); setError(null); await runIntent(report.id, report.bounty_address as `0x${string}`, "dispute", "Abriendo disputa…"); }
-                catch (caught) { setError(walletErrorMessage(caught, "No pudimos abrir la disputa")); }
+                try { setPendingDispute(report.id); setError(null); await runIntent(report.id, report.bounty_address as `0x${string}`, "dispute", "Opening dispute…"); }
+                catch (caught) { setError(walletErrorMessage(caught, "Could not open the dispute")); }
                 finally { setPendingDispute(null); }
               }} type="button">
-                {pendingDispute === report.id ? "Abriendo…" : "Disputar"}
+                {pendingDispute === report.id ? "Opening…" : "Dispute"}
               </button>
             ) : null}
           </div>
         </div>
-      )) : <div className="empty">Todavía no enviaste reportes. Elegí un programa en la pestaña <strong>Programas</strong> para empezar.</div>}
+      )) : <div className="empty">No reports submitted yet. Choose a bounty in the <strong>Bounties</strong> tab to get started.</div>}
     </div>
   );
 }

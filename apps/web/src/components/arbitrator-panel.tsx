@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { disputeResultLabels, disputeAbi } from "@bugbounty/shared/contracts";
 
 import { api } from "../lib/api";
-import { waitForTransactionReceipt, writeContractAction } from "../lib/wallet";
+import { waitForTransactionReceipt, walletErrorMessage, writeContractAction } from "../lib/wallet";
 import { AddressDisplay } from "./address-display";
 import { useToast } from "./toast";
 
@@ -88,7 +88,7 @@ export function ArbitratorPanel() {
 
   async function castVote(dispute: Dispute, voteResult: 0 | 1) {
     if (!session) {
-      setError("Tu sesión no está disponible. Volvé a ingresar con tu cuenta.");
+      setError("Session not available. Please sign in again.");
       return;
     }
 
@@ -114,7 +114,7 @@ export function ArbitratorPanel() {
         args: intent.nextAction.args,
         account: session.address as `0x${string}`,
       });
-      toast.showTx("Registrando voto…", hash);
+      toast.showTx("Registering vote…", hash);
       await waitForTransactionReceipt(hash);
 
       if (dispute.bounty_address) {
@@ -146,7 +146,7 @@ export function ArbitratorPanel() {
           args: finalizeIntent.nextAction.args,
           account: session.address as `0x${string}`,
         });
-        toast.showTx("Cerrando disputa…", finalizeHash);
+        toast.showTx("Closing dispute…", finalizeHash);
         await waitForTransactionReceipt(finalizeHash);
         if (updatedDispute.bounty_address) {
           try {
@@ -156,27 +156,27 @@ export function ArbitratorPanel() {
           }
         }
         await loadDisputes();
-        toast.showSuccess("Voto registrado y disputa cerrada por mayoría.");
+        toast.showSuccess("Vote registered and dispute closed by majority.");
         return;
       }
 
-      toast.showSuccess("Voto registrado.");
+      toast.showSuccess("Vote registered.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "No pudimos registrar tu voto");
+      setError(walletErrorMessage(caught, "Could not register your vote"));
     } finally {
       setPendingVoteId(null);
     }
   }
 
   if (loading) {
-    return <div className="panel"><p className="muted">Cargando disputas asignadas...</p></div>;
+    return <div className="panel"><p className="muted">Loading assigned disputes...</p></div>;
   }
 
   if (!session) {
     return (
       <div className="panel">
-        <h2>Panel del árbitro</h2>
-        <p className="muted">Ingresá con la cuenta asignada para ver tus casos y votar.</p>
+        <h2>Arbitrator panel</h2>
+        <p className="muted">Sign in with your assigned account to view your cases and vote.</p>
         {error ? <p className="danger">{error}</p> : null}
       </div>
     );
@@ -185,8 +185,8 @@ export function ArbitratorPanel() {
   if (session.role !== "arbitrator") {
     return (
       <div className="panel">
-        <h2>Panel del árbitro</h2>
-        <p className="muted">Esta cuenta no tiene permisos de arbitraje.</p>
+        <h2>Arbitrator panel</h2>
+        <p className="muted">This account doesn't have arbitration permissions.</p>
       </div>
     );
   }
@@ -196,10 +196,10 @@ export function ArbitratorPanel() {
       <div className="panel">
         <div className="stack-row">
           <div>
-            <h3>Panel del árbitro</h3>
-            <p className="muted" style={{ margin: "6px 0 0" }}>Revisá los casos asignados y emití tu decisión desde esta pantalla.</p>
+            <h3>Arbitrator panel</h3>
+            <p className="muted" style={{ margin: "6px 0 0" }}>Review assigned cases and cast your decision from this screen.</p>
           </div>
-          <div className="badge"><span>Cuenta</span><AddressDisplay address={session.address} link={false} /></div>
+          <div className="badge"><span>Account</span><AddressDisplay address={session.address} link={false} /></div>
         </div>
       </div>
 
@@ -207,8 +207,8 @@ export function ArbitratorPanel() {
 
       {assignedDisputes.length === 0 ? (
         <div className="empty">
-          <h3>Sin disputas asignadas</h3>
-          <p>Cuando se te asigne un caso, va a aparecer acá con su evidencia y las opciones para votar.</p>
+          <h3>No assigned disputes</h3>
+          <p>When a case is assigned to you, it will appear here with evidence and voting options.</p>
         </div>
       ) : (
         assignedDisputes.map((dispute) => {
@@ -219,37 +219,37 @@ export function ArbitratorPanel() {
           <article className="panel grid" key={dispute.id}>
             <div className="stack-row">
               <div>
-                <h3>{dispute.report_title ?? "Disputa sin título"}</h3>
-                <p className="muted">{dispute.bounty_title ?? "Programa sin nombre"}</p>
+                <h3>{dispute.report_title ?? "Untitled dispute"}</h3>
+                <p className="muted">{dispute.bounty_title ?? "Unnamed bounty"}</p>
               </div>
               <div className="row-actions">
-                {dispute.report_uuid ? <a className="tx-link" href={`/reports/${dispute.report_uuid}`}>Ver evidencia</a> : null}
+                {dispute.report_uuid ? <a className="tx-link" href={`/reports/${dispute.report_uuid}`}>View evidence</a> : null}
                 <div className="badge">
-                  <span>Estado</span>
+                  <span>Status</span>
                   <span>{dispute.status}</span>
                 </div>
               </div>
             </div>
 
-            <p>{dispute.report_description ?? "Sin descripción disponible."}</p>
+            <p>{dispute.report_description ?? "No description available."}</p>
 
             <div className="grid dispute-meta">
               <div>
-                <strong>Reporte</strong>
-                <p className="muted">{dispute.report_status ?? "Sin estado"}</p>
+                <strong>Report</strong>
+                <p className="muted">{dispute.report_status ?? "No status"}</p>
               </div>
               <div>
-                <strong>Resultado</strong>
-                <p className="muted">{dispute.result ?? "Pendiente"}</p>
+                <strong>Result</strong>
+                <p className="muted">{dispute.result ?? "Pending"}</p>
               </div>
               <div>
-                <strong>Referencia</strong>
+                <strong>Reference</strong>
                 <p className="mono">{dispute.id}</p>
               </div>
             </div>
 
             <div className="grid">
-              <strong>Votos registrados</strong>
+              <strong>Registered votes</strong>
               {dispute.votes && dispute.votes.length > 0 ? (
                 dispute.votes.map((vote) => (
                   <div className="list-row" key={`${dispute.id}-${vote.arbitrator_address}`}>
@@ -258,14 +258,14 @@ export function ArbitratorPanel() {
                   </div>
                 ))
               ) : (
-                <p className="muted">Todavía no hay votos confirmados para este caso.</p>
+                <p className="muted">No votes confirmed for this case yet.</p>
               )}
             </div>
 
             {myVote ? (
-              <p className="muted" style={{ margin: 0 }}>Ya emitiste tu voto en este caso. Esperá a que el resto del panel decida.</p>
+              <p className="muted" style={{ margin: 0 }}>You already voted on this case. Waiting for the rest of the panel.</p>
             ) : isFinalized ? (
-              <p className="muted" style={{ margin: 0 }}>El caso ya está cerrado.</p>
+              <p className="muted" style={{ margin: 0 }}>This case is closed.</p>
             ) : null}
 
             <div className="vote-actions">
@@ -273,14 +273,14 @@ export function ArbitratorPanel() {
                 disabled={votingDisabled}
                 onClick={() => void castVote(dispute, 0)}
               >
-                {pendingVoteId === dispute.id ? "Enviando voto..." : `Favorecer al hunter (${disputeResultLabels[0]})`}
+                {pendingVoteId === dispute.id ? "Submitting vote..." : `Favor hunter (${disputeResultLabels[0]})`}
               </button>
               <button
                 className="secondary"
                 disabled={votingDisabled}
                 onClick={() => void castVote(dispute, 1)}
               >
-                {pendingVoteId === dispute.id ? "Enviando voto..." : `Favorecer a la empresa (${disputeResultLabels[1]})`}
+                {pendingVoteId === dispute.id ? "Submitting vote..." : `Favor company (${disputeResultLabels[1]})`}
               </button>
             </div>
           </article>

@@ -11,9 +11,9 @@ import { getWalletAccounts, promptAccountSelection, watchWalletAccounts } from "
 import { explorerAddressUrl, shortHash } from "../lib/explorer";
 
 const ROLE_LABELS: Record<string, string> = {
-  company: "Empresa",
+  company: "Company",
   hunter: "Hunter",
-  arbitrator: "Árbitro",
+  arbitrator: "Arbitrator",
   admin: "Admin",
 };
 
@@ -31,7 +31,7 @@ function AliasEditor({ current, onClose }: { current: string | null; onClose: ()
 
   return (
     <div className="account-edit-form">
-      <span className="surface-kicker">Tu alias</span>
+      <span className="surface-kicker">Your alias</span>
       <input
         value={value}
         onChange={(event) => setValue(event.target.value)}
@@ -50,15 +50,15 @@ function AliasEditor({ current, onClose }: { current: string | null; onClose: ()
               await refreshSessionAlias(value.trim() || null);
               onClose();
             } catch (caught) {
-              setError(caught instanceof Error ? caught.message : "No pudimos guardar el alias");
+              setError(caught instanceof Error ? caught.message : "Could not save alias");
             } finally {
               setSaving(false);
             }
           }}
         >
-          {saving ? "Guardando…" : "Guardar"}
+          {saving ? "Saving…" : "Save"}
         </button>
-        <button type="button" className="secondary" onClick={onClose}>Cancelar</button>
+        <button type="button" className="secondary" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );
@@ -78,7 +78,7 @@ function AccountSwitcher({ activeAddress }: { activeAddress: string }) {
 
   return (
     <div className="account-switch">
-      <span className="surface-kicker">Conectadas · cambiá en MetaMask</span>
+      <span className="surface-kicker">Connected · switch in MetaMask</span>
       {others.map((entry) => (
         <div className="account-switch-row" key={entry}>
           <span className="account-avatar">{initialsFor(null, entry)}</span>
@@ -114,7 +114,7 @@ function AccountMenu({
         <button
           type="button"
           className="account-add-btn"
-          title="Conectar otra cuenta"
+          title="Connect another account"
           onClick={() => void promptAccountSelection()}
         >
           +
@@ -130,7 +130,7 @@ function AccountMenu({
             <button
               type="button"
               className="account-icon-btn"
-              title="Copiar dirección"
+              title="Copy address"
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(address);
@@ -141,26 +141,26 @@ function AccountMenu({
                 }
               }}
             >
-              {copied ? "Copiado" : "Copiar"}
+              {copied ? "Copied" : "Copy"}
             </button>
             <a
               className="account-icon-btn"
               href={explorerAddressUrl(address)}
               target="_blank"
               rel="noopener noreferrer"
-              title="Ver en explorer"
+              title="View on explorer"
             >
-              Explorer ↗
+              View on explorer ↗
             </a>
           </div>
 
           <AccountSwitcher activeAddress={address} />
 
           <button type="button" className="account-menu-item" onClick={() => setEditing(true)}>
-            Editar alias
+            Edit alias
           </button>
           <button type="button" className="account-menu-item account-menu-danger" onClick={onDisconnect}>
-            Desconectar
+            Disconnect
           </button>
         </>
       )}
@@ -211,14 +211,14 @@ export function RoleLinks() {
             if (!connected) {
               return (
                 <button type="button" className="connect-btn" onClick={openConnectModal}>
-                  Conectar wallet
+                  Connect wallet
                 </button>
               );
             }
             if (chain.unsupported) {
               return (
                 <button type="button" className="connect-btn connect-btn-warn" onClick={openChainModal}>
-                  Red incorrecta
+                  Wrong network
                 </button>
               );
             }

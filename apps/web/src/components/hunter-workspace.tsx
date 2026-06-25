@@ -16,12 +16,12 @@ export function HunterWorkspace() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Hunter workspace</p>
-          <h1>Programas y reportes</h1>
+          <h1>Bounties and reports</h1>
         </div>
         <nav className="tabs">
-          <button type="button" className={`tab${tab === "programs" ? " tab-active" : ""}`} onClick={() => setTab("programs")}>Programas</button>
-          <button type="button" className={`tab${tab === "report" ? " tab-active" : ""}`} onClick={() => setTab("report")}>Reportar</button>
-          <button type="button" className={`tab${tab === "mine" ? " tab-active" : ""}`} onClick={() => setTab("mine")}>Mis reportes</button>
+          <button type="button" className={`tab${tab === "programs" ? " tab-active" : ""}`} onClick={() => setTab("programs")}>Bounties</button>
+          <button type="button" className={`tab${tab === "report" ? " tab-active" : ""}`} onClick={() => setTab("report")}>Report</button>
+          <button type="button" className={`tab${tab === "mine" ? " tab-active" : ""}`} onClick={() => setTab("mine")}>My reports</button>
         </nav>
       </div>
 
@@ -38,9 +38,9 @@ export function HunterWorkspace() {
             />
           </div>
           <div className="status-rail">
-            <div><span>Evidencia</span><strong>Privada off-chain</strong></div>
-            <div><span>Autoría</span><strong>Hash verificable</strong></div>
-            <div><span>Si rechazan</span><strong>Disputa disponible</strong></div>
+            <div><span>Evidence</span><strong>Private off-chain</strong></div>
+            <div><span>Authorship</span><strong>Verifiable hash</strong></div>
+            <div><span>If rejected</span><strong>Dispute available</strong></div>
           </div>
         </div>
       ) : null}
